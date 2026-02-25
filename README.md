@@ -4,8 +4,6 @@ Interactive and static visualisation of forecast evolution ("Linus plot")
 for multiple NWP and ML models.  Built on **MARS**, **earthkit-data**,
 **Metview**, **ipywidgets** and **Plotly / Matplotlib**.
 
-![example static plot](docs/example_static.png)
-
 ---
 
 ## Features
@@ -30,13 +28,13 @@ The interactive map widget supports two selection modes:
 ### Area selection
 Draw a polygon on the map to define a bounding box.
 
-![Area selection demo](diag_evo/Area_select.gif)
+<img src="diag_evo/Area_select.gif" width="400" align="center">
 
 ### Point selection
 Click a single point on the map — the system creates a ±0.5° box around it and
 reports the nearest observation station.
 
-![Point selection demo](diag_evo/Point_select.gif)
+<img src="diag_evo/Point_select.gif" width="400" align="center">
 
 ---
 
@@ -53,9 +51,8 @@ diag_evo_v2/
 │       ├── model_settings.json
 │       ├── plot_settings.json
 │       └── variable_settings.json
-├── examples/
-│   └── forecast_evolution.ipynb   # Ready-to-run example notebook
 ├── data_files/                # Auto-created at runtime (.gitignored)
+├── forecast_evolution.ipynb   # Jupyter notebook to get you started
 ├── requirements.txt
 ├── .gitignore
 └── README.md                  # ← you are here
@@ -66,22 +63,14 @@ diag_evo_v2/
 ## Installation
 
 The package is designed to run on systems where **Metview** and
-**earthkit-data** are already available (e.g. ECMWF workstations / Atos
-HPC).  Clone the repository and install the remaining Python
-dependencies:
+**earthkit-data** are already available (e.g. AtosmHPC).  
+Clone the repository and install the remaining Python dependencies:
 
 ```bash
 git clone <repo-url> diag_evo_v2
 cd diag_evo_v2
 pip install -r requirements.txt
 ```
-
-No `pip install -e .` step is needed — just make sure `diag_evo_v2/` is
-on your `PYTHONPATH` or run notebooks from within the repository.
-
-> **Tip:** On ECMWF systems, activate the standard environment first
-> (`module load python3`, etc.) so that `metview` and `earthkit.data`
-> are available.
 
 ---
 
@@ -121,7 +110,7 @@ plot_forecast_evolution(plot_data, widgets_dict, plot_dir, export_html=True)
 plot_forecast_evolution_static(plot_data, widgets_dict, plot_dir, export_png=True)
 ```
 
-See [`examples/forecast_evolution.ipynb`](examples/forecast_evolution.ipynb)
+See [`forecast_evolution.ipynb`](forecast_evolution.ipynb)
 for a complete worked example.
 
 ---
@@ -196,3 +185,6 @@ See [`requirements.txt`](requirements.txt).  Key dependencies:
 ## License
 
 Internal use — ECMWF.
+
+## Contact
+Do you want to report issues, suggest improvements or do you have any questions? Please contact [soufiane.karmouche@ecmwf.int](mailto:soufiane.karmouche@ecmwf.int)
