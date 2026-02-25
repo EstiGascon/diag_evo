@@ -1,0 +1,283 @@
+{
+    "variable_settings": {
+        "2t": {
+            "levtype": "sfc",
+            "description": "2m Temperature",
+            "is_accumulated": false,
+            "units": "°C",
+            "grib_units": ["K", "KELVIN", "C", "CELSIUS", "°C", "°K"],
+            "conversion_rules": {
+                "K": {"to_display": "subtract_273.15", "from_display": "add_273.15"},
+                "KELVIN": {"to_display": "subtract_273.15", "from_display": "add_273.15"},
+                "C": {"to_display": "none", "from_display": "none"},
+                "CELSIUS": {"to_display": "none", "from_display": "none"},
+                "°C": {"to_display": "none", "from_display": "none"},
+                "°K": {"to_display": "subtract_273.15", "from_display": "add_273.15"}
+            }
+        },
+        "2d": {
+            "levtype": "sfc",
+            "description": "2m Dew Point Temperature",
+            "is_accumulated": false,
+            "units": "°C",
+            "grib_units": ["K", "KELVIN", "C", "CELSIUS", "°C", "°K"],
+            "conversion_rules": {
+                "K": {"to_display": "subtract_273.15", "from_display": "add_273.15"},
+                "KELVIN": {"to_display": "subtract_273.15", "from_display": "add_273.15"},
+                "C": {"to_display": "none", "from_display": "none"},
+                "CELSIUS": {"to_display": "none", "from_display": "none"},
+                "°C": {"to_display": "none", "from_display": "none"},
+                "°K": {"to_display": "subtract_273.15", "from_display": "add_273.15"}
+            }
+        },
+        "tcc": {
+            "levtype": "sfc",
+            "description": "Total Cloud Cover",
+            "is_accumulated": false,
+            "units": "%",
+            "grib_units": ["0-1", "0-100", "%", "(0 - 1)","PROBABILITY", "FRACTION"],
+            "conversion_rules": {
+                "0-1": {"to_display": "multiply_100", "from_display": "divide_100"},
+                "0-100": {"to_display": "none", "from_display": "none"},
+                "%": {"to_display": "none", "from_display": "none"},
+                "(0 - 1)": {"to_display": "multiply_100", "from_display": "divide_100"},
+                "PROBABILITY": {"to_display": "multiply_100", "from_display": "divide_100"},
+                "FRACTION": {"to_display": "multiply_100", "from_display": "divide_100"}
+            }
+        },
+        "msl": {
+            "levtype": "sfc",
+            "description": "Mean Sea Level Pressure",
+            "is_accumulated": false,
+            "units": "hPa",
+            "grib_units": ["Pa", "hPa", "mb", "mbar", "HPA"],
+            "conversion_rules": {
+                "Pa": {"to_display": "divide_100", "from_display": "multiply_100"},
+                "hPa": {"to_display": "none", "from_display": "none"},
+                "mb": {"to_display": "none", "from_display": "none"},
+                "mbar": {"to_display": "none", "from_display": "none"},
+                "HPA": {"to_display": "none", "from_display": "none"}
+            }
+        },
+        "lcc": {
+            "levtype": "sfc",
+            "description": "Low Cloud Cover",
+            "is_accumulated": false,
+            "units": "%",
+            "grib_units": ["0-1", "0-100", "%", "(0 - 1)", "PROBABILITY", "FRACTION"],
+            "param": "3073",
+            "conversion_rules": {
+                "(0 - 1)": {"to_display": "multiply_100", "from_display": "divide_100"},
+                "0-1": {"to_display": "multiply_100", "from_display": "divide_100"},
+                "0-100": {"to_display": "none", "from_display": "none"},
+                "%": {"to_display": "none", "from_display": "none"},
+                "PROBABILITY": {"to_display": "multiply_100", "from_display": "divide_100"},
+                "FRACTION": {"to_display": "multiply_100", "from_display": "divide_100"}
+            }
+        },
+        "3073": {
+            "levtype": "sfc",
+            "description": "Low Cloud Cover",
+            "is_accumulated": false,
+            "units": "%",
+            "grib_units": ["0-1", "0-100", "%", "(0 - 1)", "PROBABILITY", "FRACTION"],
+            "param": "3073",
+            "conversion_rules": {
+                "(0 - 1)": {"to_display": "multiply_100", "from_display": "divide_100"},
+                "0-1": {"to_display": "multiply_100", "from_display": "divide_100"},
+                "0-100": {"to_display": "none", "from_display": "none"},
+                "%": {"to_display": "none", "from_display": "none"},
+                "PROBABILITY": {"to_display": "multiply_100", "from_display": "divide_100"},
+                "FRACTION": {"to_display": "multiply_100", "from_display": "divide_100"}
+            }
+        },
+        "mcc": {
+            "levtype": "sfc",
+            "description": "Medium Cloud Cover",
+            "is_accumulated": false,
+            "units": "%",
+            "grib_units": ["0-1", "0-100", "%", "(0 - 1)", "PROBABILITY", "FRACTION"],
+            "conversion_rules": {
+                "(0 - 1)": {"to_display": "multiply_100", "from_display": "divide_100"},
+                "0-1": {"to_display": "multiply_100", "from_display": "divide_100"},
+                "0-100": {"to_display": "none", "from_display": "none"},
+                "%": {"to_display": "none", "from_display": "none"},
+                "PROBABILITY": {"to_display": "multiply_100", "from_display": "divide_100"},
+                "FRACTION": {"to_display": "multiply_100", "from_display": "divide_100"}
+            }
+        },
+        "hcc": {
+            "levtype": "sfc",
+            "description": "High Cloud Cover",
+            "is_accumulated": false,
+            "units": "%",
+            "grib_units": ["0-1", "0-100", "%", "(0 - 1)", "PROBABILITY", "FRACTION"],
+            "conversion_rules": {
+                "(0 - 1)": {"to_display": "multiply_100", "from_display": "divide_100"},
+                "0-1": {"to_display": "multiply_100", "from_display": "divide_100"},
+                "0-100": {"to_display": "none", "from_display": "none"},
+                "%": {"to_display": "none", "from_display": "none"},
+                "PROBABILITY": {"to_display": "multiply_100", "from_display": "divide_100"},
+                "FRACTION": {"to_display": "multiply_100", "from_display": "divide_100"}
+            }
+        },
+        "ssrd": {
+            "levtype": "sfc",
+            "description": "Surface short-wave (solar) radiation downwards",
+            "is_accumulated": true,
+            "units": "J/m2",
+            "grib_units": ["J/m2", "J/m**2", "J m**-2", "W/m2", "W/m**2", "W/m^2", "J/M2"],
+            "conversion_rules": {
+                "J/m2": {"to_display": "none", "from_display": "none"},
+                "J/m**2": {"to_display": "none", "from_display": "none"},
+                "W/m2": {"to_display": "multiply_3600", "from_display": "divide_3600"},
+                "W/m**2": {"to_display": "multiply_3600", "from_display": "divide_3600"},
+                "J m**-2": {"to_display": "none", "from_display": "none"},
+                "W/m^2": {"to_display": "multiply_3600", "from_display": "divide_3600"},
+                "J/M2": {"to_display": "none", "from_display": "none"}
+            }
+        },
+        "strd": {
+            "levtype": "sfc",
+            "description": "Surface long-wave (thermal) radiation downwards",
+            "is_accumulated": true,
+            "units": "J/m2",
+            "grib_units": ["J/m2", "J/m**2", "W/m2", "W/m**2", "J/M2"],
+            "conversion_rules": {
+                "J/m2": {"to_display": "none", "from_display": "none"},
+                "J/m**2": {"to_display": "none", "from_display": "none"},
+                "W/m2": {"to_display": "multiply_3600", "from_display": "divide_3600"},
+                "W/m**2": {"to_display": "multiply_3600", "from_display": "divide_3600"},
+                "J/M2": {"to_display": "none", "from_display": "none"}
+            }
+        },
+        "10fg": {
+            "levtype": "sfc",
+            "description": "Maximum 10 metre wind gust since previous post-processing",
+            "is_accumulated": false,
+            "units": "m/s",
+            "grib_units": ["m/s", "m s-1", "ms-1", "M/S"],
+            "conversion_rules": {
+                "m/s": {"to_display": "none", "from_display": "none"},
+                "m s-1": {"to_display": "none", "from_display": "none"},
+                "ms-1": {"to_display": "none", "from_display": "none"},
+                "M/S": {"to_display": "none", "from_display": "none"}
+            }
+        },
+        "10u": {
+            "levtype": "sfc",
+            "description": "10 metre U wind component",
+            "is_accumulated": false,
+            "units": "m/s",
+            "grib_units": ["m/s", "m s-1", "m s**-1","ms-1", "M/S"],
+            "conversion_rules": {
+                "m/s": {"to_display": "none", "from_display": "none"},
+                "m s-1": {"to_display": "none", "from_display": "none"},
+                "m s**-1": {"to_display": "none", "from_display": "none"},
+                "ms-1": {"to_display": "none", "from_display": "none"},
+                "M/S": {"to_display": "none", "from_display": "none"}
+            }
+        },
+        "10v": {
+            "levtype": "sfc",
+            "description": "10 metre V wind component",
+            "is_accumulated": false,
+            "units": "m/s",
+            "grib_units": ["m/s", "m s-1", "m s**-1","ms-1", "M/S"],
+            "conversion_rules": {
+                "m/s": {"to_display": "none", "from_display": "none"},
+                "m s-1": {"to_display": "none", "from_display": "none"},
+                "m s**-1": {"to_display": "none", "from_display": "none"},
+                "ms-1": {"to_display": "none", "from_display": "none"},
+                "M/S": {"to_display": "none", "from_display": "none"}
+            }
+        },
+        "10si": {
+            "levtype": "sfc",
+            "description": "10 metre wind speed",
+            "is_accumulated": false,
+            "units": "m/s",
+            "grib_units": ["m/s", "m s-1", "m s**-1","ms-1", "M/S"],
+            "conversion_rules": {
+                "m/s": {"to_display": "none", "from_display": "none"},
+                "m s-1": {"to_display": "none", "from_display": "none"},
+                "m s**-1": {"to_display": "none", "from_display": "none"},
+                "ms-1": {"to_display": "none", "from_display": "none"},
+                "M/S": {"to_display": "none", "from_display": "none"}
+            }
+        },
+        "tp": {
+            "levtype": "sfc",
+            "description": "Total Precipitation",
+            "is_accumulated": true,
+            "units": "mm",
+            "grib_units": ["m", "mm", "kg/m2", "kg/m**2", "kg m-2", "kgm-2", "kg m**-2"],
+            "conversion_rules": {
+                "m": {"to_display": "multiply_1000", "from_display": "divide_1000"},
+                "mm": {"to_display": "none", "from_display": "none"},
+                "kg/m2": {"to_display": "none", "from_display": "none"},
+                "kg/m**2": {"to_display": "none", "from_display": "none"},
+                "kg m**-2": {"to_display": "none", "from_display": "none"},
+                "kg m-2": {"to_display": "none", "from_display": "none"},
+                "kgm-2": {"to_display": "none", "from_display": "none"}
+            }
+        },
+        "t": {
+            "levtype": "pl",
+            "description": "Temperature",
+            "is_accumulated": false,
+            "units": "°C",
+            "grib_units": ["K", "KELVIN", "C", "CELSIUS", "°C", "°K"],
+            "conversion_rules": {
+                "K": {"to_display": "subtract_273.15", "from_display": "add_273.15"},
+                "KELVIN": {"to_display": "subtract_273.15", "from_display": "add_273.15"},
+                "C": {"to_display": "none", "from_display": "none"},
+                "CELSIUS": {"to_display": "none", "from_display": "none"},
+                "°C": {"to_display": "none", "from_display": "none"},
+                "°K": {"to_display": "subtract_273.15", "from_display": "add_273.15"}
+            },
+            "levels": {
+                "T1000": 1000,
+                "T925": 925,
+                "T850": 850,
+                "T700": 700,
+                "T500": 500,
+                "T400": 400,
+                "T300": 300,
+                "T250": 250,
+                "T200": 200,
+                "T100": 100,
+                "T50": 50
+            }
+        },
+        "z": {
+            "levtype": "pl",
+            "description": "Geopotential Height",
+            "is_accumulated": false,
+            "units": "dam",
+            "grib_units": ["m2/s2", "m**2/s**2", "m^2/s^2","m**2 s**-2", "dam", "m", "M2/S2"],
+            "conversion_rules": {
+                "m2/s2": {"to_display": "divide_by_g", "from_display": "multiply_by_g"},
+                "m**2/s**2": {"to_display": "divide_by_g", "from_display": "multiply_by_g"},
+                "m^2/s^2": {"to_display": "divide_by_g", "from_display": "multiply_by_g"},
+                "m**2 s**-2": {"to_display": "divide_by_g", "from_display": "multiply_by_g"},
+                "dam": {"to_display": "none", "from_display": "none"},
+                "m": {"to_display": "divide_10", "from_display": "multiply_10"},
+                "M2/S2": {"to_display": "divide_by_g", "from_display": "multiply_by_g"}
+            },
+            "levels": {
+                "Z1000": 1000,
+                "Z925": 925,
+                "Z850": 850,
+                "Z700": 700,
+                "Z500": 500,
+                "Z400": 400,
+                "Z300": 300,
+                "Z250": 250,
+                "Z200": 200,
+                "Z100": 100,
+                "Z50": 50
+            }
+        }
+    }
+} 

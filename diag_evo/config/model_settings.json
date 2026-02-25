@@ -1,0 +1,72 @@
+{
+    "models": {
+        "IFS Control": {
+            "class": "od",
+            "expver": 1,
+            "stream": "oper",
+            "type": "fc",
+            "ensemble": false
+        },
+        "AIFS Single": {
+            "class": "ai",
+            "expver": "1",
+            "stream": "oper",
+            "model": "aifs-single",
+            "type": "fc",
+            "ensemble": false
+        },
+        "AIFS ENS Control": {
+            "class": "ai",
+            "expver": "1",
+            "stream": "enfo",
+            "model": "aifs-ens",
+            "type": "cf",
+            "ensemble": false
+        },
+        "IFS ENS": {
+            "class": "od",
+            "stream": "enfo",
+            "type": "pf",
+            "number": [1, "TO", 50],
+            "ensemble": true
+        },
+        "AIFS CRPS-ENS": {
+            "class": "ai",
+            "expver": "1",
+            "stream": "enfo",
+            "model": "aifs-ens",
+            "type": "pf",
+            "number": [1, "TO", 50],
+            "ensemble": true
+        },
+        "DE-LUMI": {
+            "class": "d1",
+            "expver": "0001",
+            "stream": "oper",
+            "dataset": "extremes-dt",
+            "type": "fc",
+            "address": "polytope.lumi.apps.dte.destination-earth.eu",
+            "ensemble": false
+        },
+
+        "DE-ATOS": {
+            "class": "rd",
+            "expver": "iekm",
+            "stream": "oper",
+            "type": "fc",
+            "grid": [0.05,0.05],
+            "ensemble": false
+        }
+    },
+    "analysis": {
+        "class": "od",
+        "stream": "oper",
+        "type": "an"
+    },
+    "climatology": {
+        "class": "ea",
+        "expver": 1,
+        "stream": "dacl",
+        "type": "em"
+    }
+} 

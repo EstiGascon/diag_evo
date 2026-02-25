@@ -1,0 +1,169 @@
+{
+    "models": {
+        "IFS Control": {
+            "color": "#1f77b4",
+            "marker": {
+                "symbol": "triangle-down",
+                "size": 12,
+                "line": {
+                    "color": "#0d47a1",
+                    "width": 2
+                }
+            },
+            "line": null
+        },
+        "AIFS Single": {
+            "color": "#2ca02c",
+            "marker": {
+                "symbol": "triangle-down",
+                "size": 12,
+                "line": {
+                    "color": "#1b5e20",
+                    "width": 2
+                }
+            },
+            "line": null
+        },
+        "AIFS ENS Control": {
+            "color": "#d62728",
+            "marker": {
+                "symbol": "diamond",
+                "size": 12,
+                "line": {
+                    "color": "#b71c1c",
+                    "width": 2
+                }
+            },
+            "line": {
+                "color": "#d62728",
+                "width": 3
+            }
+        },
+        
+        "IFS ENS": {
+            "color": "#1f77b4",
+            "box": {
+                "fillcolor": "rgba(31, 119, 180, 0.3)",
+                "marker_color": "#1f77b4",
+                "width": 0.35
+            },
+            "marker": {
+                "jitter": 0.3,
+                "pointpos": 0
+            }
+        },
+        "AIFS CRPS-ENS": {
+            "color": "#2ca02c",
+            "box": {
+                "fillcolor": "rgba(44, 160, 44, 0.3)",
+                "marker_color": "#2ca02c",
+                "width": 0.35
+            },
+            "marker": {
+                "jitter": 0.3,
+                "pointpos": 0
+            }
+        },
+
+        "IFS ENS Mean": {
+            "color": "#1f77b4",
+            "marker": {
+                "symbol": "star",
+                "size": 12,
+                "color": "rgba(31, 119, 180, 0.7)",
+                "line": {
+                    "color": "#0d47a1",
+                    "width": 2
+                }
+            },
+            "line": {
+                "color": "#1f77b4",
+                "width": 2
+            }
+        },
+        "AIFS CRPS-ENS Mean": {
+            "color": "#2ca02c",
+            "marker": {
+                "symbol": "star",
+                "size": 12,
+                "color": "rgba(44, 160, 44, 0.7)",
+                "line": {
+                    "color": "#1b5e20",
+                    "width": 2
+                }
+            },
+            "line": {
+                "color": "#2ca02c",
+                "width": 2
+            }
+        },
+        "DE-LUMI": {
+            "color": "#17becf",
+            "marker": {
+                "symbol": "diamond",
+                "size": 12,
+                "line": {
+                    "color": "#006064",
+                    "width": 2
+                }
+            }
+        },
+        "DE-ATOS": {
+            "color": "#9467bd",
+            "marker": {
+                "symbol": "diamond",
+                "size": 12,
+                "line": {
+                    "color": "#6a1b9a",
+                    "width": 2
+                }
+            }
+        }
+    },
+    "reference": {
+        "Observations": {
+            "color": "#000000",
+            "marker": {
+                "symbol": "circle",
+                "size": 14,
+                "line": {
+                    "color": "#000000",
+                    "width": 2
+                }
+            }
+        },
+        "Analysis": {
+            "color": "#ff7f0e",
+            "marker": {
+                "symbol": "triangle-up",
+                "size": 12,
+                "line": {
+                    "color": "#e65100",
+                    "width": 2
+                }
+            }
+        },
+        "Climatology Mean": {
+            "color": "#7f7f7f",
+            "marker": {
+                "symbol": "star",
+                "size": 12,
+                "line": {
+                    "color": "#424242",
+                    "width": 2
+                }
+            }
+        }
+    },
+    "layout": {
+        "height": 800,
+        "width": 2000,
+        "xaxis": {
+            "tickangle": 0,
+            "showgrid": true,
+            "gridwidth": 1,
+            "gridcolor": "white",
+            "dtick": 12
+        }
+    }
+} 

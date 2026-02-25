@@ -1,0 +1,10 @@
+numpy
+pandas
+plotly
+matplotlib
+cartopy
+ipywidgets>=7.0
+ipyleaflet
+earthkit-data
+
+# metview — typically pre-installed on ECMWF systems
