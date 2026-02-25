@@ -28,13 +28,13 @@ The interactive map widget supports two selection modes:
 ### Area selection
 Draw a polygon on the map to define a bounding box.
 
-<img src="diag_evo/Area_select.gif" width="400" align="center">
+<img src="./diag_evo/Area_select.gif" width="400" align="center">
 
 ### Point selection
 Click a single point on the map — the system creates a ±0.5° box around it and
 reports the nearest observation station.
 
-<img src="diag_evo/Point_select.gif" width="400" align="center">
+<img src="./diag_evo/Point_select.gif" width="400" align="center">
 
 ---
 
@@ -112,7 +112,6 @@ plot_forecast_evolution_static(plot_data, widgets_dict, plot_dir, export_png=Tru
 
 See [`forecast_evolution.ipynb`](forecast_evolution.ipynb)
 for a complete worked example.
-
 ---
 
 ## Adding custom models
