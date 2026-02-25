@@ -12,7 +12,7 @@ for multiple NWP and ML models.  Built on **MARS**, **earthkit-data**,
 
 | Feature | Details |
 |---------|---------|
-| **Predefined models** | IFS Control, AIFS Single, AIFS ENS Control, IFS ENS, AIFS CRPS-ENS, DE-LUMI, DE-ATOS |
+| **Predefined models** | IFS Control, AIFS Single, AIFS ENS Control, IFS ENS, AIFS ENS, DE-LUMI, DE-ATOS |
 | **Custom MARS models** | Add any model at runtime by specifying `class`, `type`, `stream`, `expver` and optional extra MARS keys |
 | **Interactive plot** | Plotly box-plots with hover info (bias, lead time, member index) |
 | **Static plot** | Matplotlib percentile boxes (1/10/25/50/75/90/99) with inset map |
@@ -144,7 +144,7 @@ Override plot colours for any model *before* calling the plot functions:
 ```python
 widgets_dict['config']['model_colors'] = {
     'IFS Control': '#dd00ff',
-    'AIFS CRPS-ENS': '#2c32a0',
+    'AIFS ENS': '#2c32a0',
 }
 ```
 

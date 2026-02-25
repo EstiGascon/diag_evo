@@ -169,7 +169,17 @@ def _model_display_label(model_name):
 
 def _build_ylabel(param, widgets_dict):
     """Build a y-axis label including display name, units, and accumulation period."""
-    display_name = _safe_display_name(param)  # already includes (units)
+    # If the user entered a bare variable (e.g. 'z') with a separate level widget,
+    # build a combined name so the label reads e.g. 'z500' instead of just 'z'.
+    effective_param = param
+    level_from_name = get_level(param)
+    if level_from_name is None:
+        levtype = widgets_dict.get('levtype_widget')
+        level_w = widgets_dict.get('level_widget')
+        if levtype is not None and getattr(levtype, 'value', '') == 'pl' and level_w is not None:
+            effective_param = f"{param}{level_w.value}"
+
+    display_name = _safe_display_name(effective_param)
     if _get_var_settings_safe(param).get('is_accumulated', False):
         acc_widget = widgets_dict.get('acc_period_widget', None)
         acc_val = acc_widget.value if acc_widget is not None else ''
@@ -1177,8 +1187,8 @@ def retrieve_and_store_data(widgets_dict, base_path):
                         if is_ensemble and str(request.get('type', '')).lower() == 'pf':
                             request["number"] = [1, "TO", widgets_dict['config']['n_members']]
 
-                        # Special expver override only for predefined AIFS CRPS-ENS
-                        if model_name == "AIFS CRPS-ENS":
+                        # Special expver override only for predefined AIFS ENS
+                        if model_name == "AIFS ENS":
                             if fc_date <= datetime(2025, 7, 1, 0, 0):
                                 request['expver'] = '103'
                             else:
@@ -1649,9 +1659,19 @@ def plot_forecast_evolution(plot_data, widgets_dict, plot_dir, export_html=False
         )
 
     if point:
-        titre=f"Forecast Evolution (Valid: {valid_date}) for {point[0]:.4f}°N , {point[1]:.4f}°E"
+        titre = (f"Forecast Evolution (Valid: {valid_date.strftime('%Y-%m-%d %H:%M')}) "
+                f"at {point[0]:.3f}\u00b0N, {point[1]:.3f}\u00b0E")
+        ns = plot_data.get('nearest_gridinfo_dict', {}).get('nearest_station')
+        if ns is not None:
+            titre += (f"<br>Nearest station (stnid: {ns['stnid']}, "
+                     f"elev: {ns['elevation']}, "
+                     f"lat: {ns['latitude']:.2f}, lon: {ns['longitude']:.2f}, "
+                     f"dist: {ns['distance']:.2f} km, "
+                     f"value: {ns['value_0']:.2f})")
     else:
-        titre=f"Forecast Evolution (Valid: {valid_date}) for {area_sub[0]:.4f}°N to {area_sub[2]:.4f}°N, {area_sub[1]:.4f}°E to {area_sub[3]:.4f}°E"
+        titre = (f"Forecast Evolution (Valid: {valid_date.strftime('%Y-%m-%d %H:%M')}) "
+                f"for {area_sub[0]:.4f}°N to {area_sub[2]:.4f}°N, "
+                f"{area_sub[1]:.4f}°E to {area_sub[3]:.4f}°E")
 
     # Get layout settings
     layout_settings = get_layout_settings()
@@ -1925,7 +1945,14 @@ def plot_forecast_evolution_static(plot_data, widgets_dict, plot_dir,
 
     if point:
         titre = (f"Forecast Evolution (Valid: {valid_date.strftime('%Y-%m-%d %H:%M')}) "
-                 f"at {point[0]:.4f}°N, {point[1]:.4f}°E")
+                 f"at {point[0]:.3f}\u00b0N, {point[1]:.3f}\u00b0E")
+        ns = plot_data.get('nearest_gridinfo_dict', {}).get('nearest_station')
+        if ns is not None:
+            titre += (f"\nNearest station (stnid: {ns['stnid']}, "
+                     f"elev: {ns['elevation']}, "
+                     f"lat: {ns['latitude']:.2f}, lon: {ns['longitude']:.2f}, "
+                     f"dist: {ns['distance']:.2f} km, "
+                     f"value: {ns['value_0']:.2f})")
     else:
         titre = (f"Forecast Evolution (Valid: {valid_date.strftime('%Y-%m-%d %H:%M')}) "
                  f"for {area_sub[0]:.4f}°N to {area_sub[2]:.4f}°N, "
@@ -1975,6 +2002,13 @@ def plot_forecast_evolution_static(plot_data, widgets_dict, plot_dir,
     axins.add_feature(cfeature.BORDERS, linewidth=0.5, edgecolor='gray')
     axins.add_feature(cfeature.LAND, facecolor='whitesmoke', zorder=0)
 
+    gl = axins.gridlines(crs=ccrs.PlateCarree(), draw_labels=True,
+                         linewidth=0.5, color='gray', alpha=0.5, linestyle='--')
+    gl.top_labels = False
+    gl.right_labels = False
+    gl.xlabel_style = {'size': 8}
+    gl.ylabel_style = {'size': 8}
+
     if point:
         axins.plot(point[1], point[0], marker='*', color='red', markersize=14,
                    markeredgecolor='black', markeredgewidth=0.8,
@@ -2003,6 +2037,8 @@ def plot_forecast_evolution_static(plot_data, widgets_dict, plot_dir,
         fig_mpl.savefig(png_filename, dpi=150, bbox_inches='tight')
         print(f"Static plot exported to: {png_filename}")
 
+    plt.show()
+    plt.close(fig_mpl)
     return fig_mpl
 
 

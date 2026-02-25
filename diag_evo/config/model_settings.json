@@ -30,7 +30,7 @@
             "number": [1, "TO", 50],
             "ensemble": true
         },
-        "AIFS CRPS-ENS": {
+        "AIFS ENS": {
             "class": "ai",
             "expver": "1",
             "stream": "enfo",

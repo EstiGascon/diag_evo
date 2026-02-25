@@ -33,25 +33,28 @@ def get_level(var):
     return None
 
 def get_variable_settings(var):
-    """Get settings for a specific variable"""
+    """Get settings for a specific variable.
+
+    Accepts both combined names like 'z500' and bare names like 'z'.
+    When a level is embedded in the name it is validated against the
+    known levels, but a missing level is tolerated so that callers
+    can still look up units / conversion rules for the base variable.
+    """
     settings = load_variable_settings()
     base_var = get_base_var(var)
     var_settings = settings.get(base_var, {})
-    
+
     if not var_settings:
         raise ValueError(f"Settings for variable '{var}' not found in variable_settings.json")
-    
-    # If this is a pressure level variable, verify the level
+
+    # If this is a pressure level variable *and* a level was given, validate it
     if var_settings['levtype'] == 'pl':
         level = get_level(var)
-        if level is None:
-            raise ValueError(f"Level must be specified for pressure level variable '{var}' (e.g., T850, Z500)")
-        
-        # Get the valid levels for this variable
-        valid_levels = list(var_settings['levels'].values())
-        if level not in valid_levels:
-            raise ValueError(f"Invalid level {level} for variable '{var}'. Valid levels are {valid_levels}")
-    
+        if level is not None:
+            valid_levels = list(var_settings['levels'].values())
+            if level not in valid_levels:
+                raise ValueError(f"Invalid level {level} for variable '{var}'. Valid levels are {valid_levels}")
+
     return var_settings
 
 def get_grib_units(data):
@@ -218,12 +221,20 @@ def process_accumulated_data(data, step_start, step):
         return data_end - data_start
 
 def get_variable_display_name(var):
-    """Get the display name for a variable"""
+    """Get the display name for a variable.
+
+    For pressure-level variables the level is included when available
+    (e.g. 'z500' -> 'Geopotential Height at 500hPa (dam)').
+    If only the bare name is given (e.g. 'z') the level is omitted.
+    """
     settings = get_variable_settings(var)
     base_var = get_base_var(var)
-    
+
     if base_var in ['t', 'z']:
         level = get_level(var)
-        return f"{settings['description']} at {level}hPa ({settings['units']})"
+        if level is not None:
+            return f"{settings['description']} at {level}hPa ({settings['units']})"
+        # bare name — no level embedded
+        return f"{settings['description']} ({settings['units']})"
     else:
         return f"{settings['description']} ({settings['units']})" 

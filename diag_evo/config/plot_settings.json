@@ -36,7 +36,7 @@
             },
             "line": {
                 "color": "#d62728",
-                "width": 3
+                "width": 2
             }
         },
         
@@ -52,7 +52,7 @@
                 "pointpos": 0
             }
         },
-        "AIFS CRPS-ENS": {
+        "AIFS ENS": {
             "color": "#2ca02c",
             "box": {
                 "fillcolor": "rgba(44, 160, 44, 0.3)",
@@ -81,7 +81,7 @@
                 "width": 2
             }
         },
-        "AIFS CRPS-ENS Mean": {
+        "AIFS ENS Mean": {
             "color": "#2ca02c",
             "marker": {
                 "symbol": "star",
