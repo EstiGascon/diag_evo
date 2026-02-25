@@ -23,6 +23,23 @@ for multiple NWP and ML models.  Built on **MARS**, **earthkit-data**,
 
 ---
 
+## Area & Point Selection
+
+The interactive map widget supports two selection modes:
+
+### Area selection
+Draw a polygon on the map to define a bounding box.
+
+![Area selection demo](diag_evo/Area_select.gif)
+
+### Point selection
+Click a single point on the map — the system creates a ±0.5° box around it and
+reports the nearest observation station.
+
+![Point selection demo](diag_evo/Point_select.gif)
+
+---
+
 ## Repository layout
 
 ```
