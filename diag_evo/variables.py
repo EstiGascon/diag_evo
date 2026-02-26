@@ -32,15 +32,43 @@ def get_level(var):
         return int(var[1:])
     return None
 
+def _resolve_param_id(var, settings):
+    """If *var* is a numeric string (e.g. '167'), look it up by paramId.
+
+    Returns the (shortName, var_settings) tuple if found, otherwise
+    ``(None, {})``.
+    """
+    try:
+        pid = int(var)
+    except (ValueError, TypeError):
+        return None, {}
+
+    for short_name, entry in settings.items():
+        if entry.get("paramId") == pid:
+            return short_name, entry
+    return None, {}
+
+
 def get_variable_settings(var):
     """Get settings for a specific variable.
 
-    Accepts both combined names like 'z500' and bare names like 'z'.
+    Accepts:
+      - combined names like ``'z500'`` or ``'T850'``
+      - bare shortNames like ``'z'``, ``'2t'``
+      - numeric paramId strings like ``'167'`` (→ 2t)
+
     When a level is embedded in the name it is validated against the
     known levels, but a missing level is tolerated so that callers
     can still look up units / conversion rules for the base variable.
     """
     settings = load_variable_settings()
+
+    # ── Try paramId lookup first ──
+    resolved_name, var_settings = _resolve_param_id(var, settings)
+    if var_settings:
+        return var_settings
+
+    # ── Standard shortName lookup ──
     base_var = get_base_var(var)
     var_settings = settings.get(base_var, {})
 
