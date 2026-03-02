@@ -41,7 +41,7 @@ reports the nearest observation station.
 ## Repository layout
 
 ```
-diag_evo_v2/
+diag_evo/
 ├── diag_evo/                  # Python package
 │   ├── __init__.py            # Public API
 │   ├── core.py                # UI, retrieval and plotting logic
@@ -63,12 +63,12 @@ diag_evo_v2/
 ## Installation
 
 The package is designed to run on systems where **Metview** and
-**earthkit-data** are already available (e.g. AtosmHPC).  
-Clone the repository and install the remaining Python dependencies:
+**earthkit-data** are already available (e.g. Atos HPC).  
+Clone the repository and install the remaining Python dependencies (if needed):
 
 ```bash
-git clone <repo-url> diag_evo_v2
-cd diag_evo_v2
+git clone https://git.ecmwf.int/scm/~ecm3468/diag_evo.git diag_evo
+cd diag_evo
 pip install -r requirements.txt
 ```
 
@@ -78,7 +78,7 @@ pip install -r requirements.txt
 
 ```python
 import sys, os
-sys.path.insert(0, "/path/to/diag_evo_v2")
+sys.path.insert(0, "/path/to/diag_evo")
 
 from diag_evo import (
     setup_interface,
