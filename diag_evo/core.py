@@ -23,6 +23,42 @@ import os
 import traceback
 import json
 
+
+def find_notebook_dir():
+    """Locate the directory containing the notebook (and the diag_evo package).
+
+    Checks several candidate paths (VS Code notebook path variable,
+    ``os.path.abspath('')``, ``os.getcwd()``) and returns the first one
+    that contains a ``diag_evo/`` sub-directory.
+
+    Returns
+    -------
+    str
+        Absolute path to the notebook directory.
+
+    Raises
+    ------
+    FileNotFoundError
+        If none of the candidate directories contain ``diag_evo/``.
+    """
+    import sys
+    candidates = []
+    # 1. VS Code injects the notebook path into this variable
+    caller_globals = sys._getframe(1).f_globals
+    vsc = caller_globals.get("__vsc_ipynb_file__")
+    if vsc:
+        candidates.append(os.path.dirname(os.path.realpath(vsc)))
+    # 2. Standard Jupyter: CWD is normally the notebook directory
+    candidates.append(os.path.abspath(""))
+    candidates.append(os.getcwd())
+    for d in candidates:
+        if os.path.isdir(os.path.join(d, "diag_evo")):
+            return d
+    raise FileNotFoundError(
+        "Could not locate the diag_evo package. "
+        "Make sure you run this notebook from within the diag_evo_v2 directory."
+    )
+
 from .variables import (
     load_variable_settings, get_base_var, get_level, get_variable_settings,
     convert_to_display, convert_from_display, get_grib_units,
@@ -267,7 +303,7 @@ def create_widgets():
     # Create date picker widget
     date_widget = widgets.DatePicker(
         description='Valid Date:',
-        value=datetime.now() - timedelta(days=7),
+        value=datetime.now() - timedelta(days=2),
         style={'description_width': 'initial'}
     )
 
@@ -315,7 +351,7 @@ def create_widgets():
 
     # Create widgets for forecast settings
     max_days_widget = widgets.IntSlider(
-        value=2,
+        value=3,
         min=1,
         max=15,
         step=1,
@@ -853,7 +889,7 @@ def setup_interface():
 
 def retrieve_and_store_data(widgets_dict, base_path):
     """Retrieve data and create the plot"""
-    global valid_date, param, area_sub, forecast_dates, forecast_steps, max_days, step_interval, data_dir
+    global valid_date, param, area_sub, point, forecast_dates, forecast_steps, max_days, step_interval, data_dir
     
     # Get variable settings (safe — works for unknown params too)
     var_settings = _get_var_settings_safe(param)
@@ -1426,6 +1462,23 @@ def plot_forecast_evolution(plot_data, widgets_dict, plot_dir, export_html=False
 
     data_df = plot_data['data_df'].iloc[::-1].reset_index(drop=True).copy()  # Make a copy to avoid modifying original
 
+    # Determine ensemble models for dynamic x-offset spacing
+    _ensemble_models = [
+        m for m in widgets_dict['model_widgets'].value
+        if get_model_retrieval_settings(m)['ensemble']
+    ]
+    _n_ens = len(_ensemble_models)
+    # Build a mapping: ensemble_model_name -> x-offset
+    # Spread offsets symmetrically around 0, e.g. 2 models -> -0.2, +0.2;
+    # 3 models -> -0.25, 0.0, +0.25; etc.
+    _ens_offsets = {}
+    if _n_ens == 1:
+        _ens_offsets[_ensemble_models[0]] = 0.0
+    elif _n_ens > 1:
+        total_span = min(0.6, 0.2 * _n_ens)  # cap at 0.6 to avoid overlap
+        for idx, m in enumerate(_ensemble_models):
+            _ens_offsets[m] = -total_span / 2 + idx * total_span / (_n_ens - 1)
+
     # Add traces for each model
     for model_name in widgets_dict['model_widgets'].value:
         model_settings = get_model_retrieval_settings(model_name)
@@ -1468,7 +1521,7 @@ def plot_forecast_evolution(plot_data, widgets_dict, plot_dir, export_html=False
                     _dlabel = _model_display_label(model_name)
                     fig.add_trace(
                         go.Box(
-                            x=[i - 0.2 if model_name == 'IFS ENS' else i + 0.2 for i, _ in valid_data],
+                            x=[i + _ens_offsets.get(model_name, 0.0) for i, _ in valid_data],
                             y=[val for _, val in valid_data],
                             name=_dlabel,
                             fillcolor=plot_settings['box']['fillcolor'],
@@ -1551,8 +1604,8 @@ def plot_forecast_evolution(plot_data, widgets_dict, plot_dir, export_html=False
                         bias
                     ])
                 
-                # Set mode based on model name
-                mode = 'lines+markers' if model_name == 'AIFS ENS Control' else 'markers'
+                # Set mode based on plot_settings: use lines+markers if 'line' config exists
+                mode = 'lines+markers' if plot_settings.get('line') is not None else 'markers'
                 
                 # Create trace dictionary
                 _dlabel = _model_display_label(model_name)
@@ -1577,7 +1630,7 @@ def plot_forecast_evolution(plot_data, widgets_dict, plot_dir, export_html=False
                 )
                 
                 # Add line settings if mode includes lines
-                if 'lines' in mode and 'line' in plot_settings:
+                if 'lines' in mode and plot_settings.get('line') is not None:
                     trace_dict['line'] = dict(
                         color=plot_settings['line']['color'],
                         width=plot_settings['line']['width']
@@ -1984,7 +2037,7 @@ def plot_forecast_evolution_static(plot_data, widgets_dict, plot_dir,
 
     # Inset map — directly below the legend, same column width
     _map_h = 0.28
-    _map_y = 0.25
+    _map_y = 0.20
     map_n, map_w, map_s, map_e = area_sub
     center_lat = (map_n + map_s) / 2.0
     center_lon = (map_w + map_e) / 2.0

@@ -5,6 +5,5 @@ matplotlib
 cartopy
 ipywidgets>=7.0
 ipyleaflet
-earthkit-data
-
+# earthkit-data — typically pre-installed on ECMWF systems
 # metview — typically pre-installed on ECMWF systems

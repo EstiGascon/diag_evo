@@ -28,16 +28,13 @@
             "color": "#d62728",
             "marker": {
                 "symbol": "diamond",
-                "size": 12,
+                "size": 9,
                 "line": {
                     "color": "#b71c1c",
-                    "width": 2
+                    "width": 1.5
                 }
             },
-            "line": {
-                "color": "#d62728",
-                "width": 2
-            }
+            "line": null
         },
         
         "IFS ENS": {
@@ -78,7 +75,7 @@
             },
             "line": {
                 "color": "#1f77b4",
-                "width": 2
+                "width": 1.5
             }
         },
         "AIFS ENS Mean": {
@@ -94,25 +91,14 @@
             },
             "line": {
                 "color": "#2ca02c",
-                "width": 2
-            }
-        },
-        "DE-LUMI": {
-            "color": "#17becf",
-            "marker": {
-                "symbol": "diamond",
-                "size": 12,
-                "line": {
-                    "color": "#006064",
-                    "width": 2
-                }
+                "width": 1.5
             }
         },
         "DE-ATOS": {
             "color": "#9467bd",
             "marker": {
                 "symbol": "diamond",
-                "size": 12,
+                "size": 9,
                 "line": {
                     "color": "#6a1b9a",
                     "width": 2

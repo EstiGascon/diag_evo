@@ -39,22 +39,12 @@
             "number": [1, "TO", 50],
             "ensemble": true
         },
-        "DE-LUMI": {
-            "class": "d1",
-            "expver": "0001",
-            "stream": "oper",
-            "dataset": "extremes-dt",
-            "type": "fc",
-            "address": "polytope.lumi.apps.dte.destination-earth.eu",
-            "ensemble": false
-        },
-
         "DE-ATOS": {
             "class": "rd",
             "expver": "iekm",
             "stream": "oper",
             "type": "fc",
-            "grid": [0.05,0.05],
+            "grid": "O2560",
             "ensemble": false
         }
     },
