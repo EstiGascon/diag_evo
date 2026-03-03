@@ -5,6 +5,7 @@
             "expver": 1,
             "stream": "oper",
             "type": "fc",
+            "grid": "O1280",
             "ensemble": false
         },
         "AIFS Single": {
@@ -13,6 +14,7 @@
             "stream": "oper",
             "model": "aifs-single",
             "type": "fc",
+            "grid": "O320",
             "ensemble": false
         },
         "AIFS ENS Control": {
@@ -21,6 +23,7 @@
             "stream": "enfo",
             "model": "aifs-ens",
             "type": "cf",
+            "grid": "O320",
             "ensemble": false
         },
         "IFS ENS": {
@@ -28,6 +31,7 @@
             "stream": "enfo",
             "type": "pf",
             "number": [1, "TO", 50],
+            "grid": "O1280",
             "ensemble": true
         },
         "AIFS ENS": {
@@ -37,6 +41,7 @@
             "model": "aifs-ens",
             "type": "pf",
             "number": [1, "TO", 50],
+            "grid": "O320",
             "ensemble": true
         },
         "DE-ATOS": {
@@ -51,12 +56,14 @@
     "analysis": {
         "class": "od",
         "stream": "oper",
-        "type": "an"
+        "type": "an",
+        "grid": "O1280"
     },
     "climatology": {
         "class": "ea",
         "expver": 1,
         "stream": "dacl",
-        "type": "em"
+        "type": "em",
+        "grid": "O320"
     }
 } 

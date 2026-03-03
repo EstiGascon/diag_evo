@@ -650,7 +650,7 @@
             "levtype": "pl",
             "description": "Geopotential Height",
             "is_accumulated": false,
-            "units": "dam",
+            "units": "m",
             "grib_units": [
                 "m2/s2",
                 "m**2/s**2",
@@ -678,12 +678,12 @@
                     "from_display": "multiply_by_g"
                 },
                 "dam": {
-                    "to_display": "none",
-                    "from_display": "none"
+                    "to_display": "multiply_10",
+                    "from_display": "divide_10"
                 },
                 "m": {
-                    "to_display": "divide_10",
-                    "from_display": "multiply_10"
+                    "to_display": "none",
+                    "from_display": "none"
                 },
                 "M2/S2": {
                     "to_display": "divide_by_g",

@@ -1063,9 +1063,9 @@ def retrieve_and_store_data(widgets_dict, base_path):
                 request = _build_base_request(param, levtype, level, valid_date, valid_date.hour, area_sub)
                 request.update(get_analysis_settings())
                 
-                # Add grid for pressure level variables
-                if levtype == 'pl':
-                    request["grid"] = [0.05, 0.05]
+                # Grid from settings: only keep for pressure level variables
+                if levtype != 'pl':
+                    request.pop('grid', None)
                 
                 analysis = earthkit.data.from_source("mars", request)
                 analysis.save(analysis_file)
@@ -1109,9 +1109,9 @@ def retrieve_and_store_data(widgets_dict, base_path):
             request = _build_base_request(param, levtype, level, valid_date, valid_date.hour, area_sub)
             request.update(get_climatology_settings())
             
-            # Add grid for pressure level variables
-            if levtype == 'pl':
-                request["grid"] = [0.05, 0.05]
+            # Grid from settings: only keep for pressure level variables
+            if levtype != 'pl':
+                request.pop('grid', None)
             
             data_clim_em = earthkit.data.from_source("mars", request)
             data_clim_em.save(clim_file)
@@ -1183,8 +1183,10 @@ def retrieve_and_store_data(widgets_dict, base_path):
                     model_ret = get_model_retrieval_settings(model_name)
                     request.update(model_ret)
 
-                    if levtype == 'pl':
-                        request["grid"] = [0.05, 0.05]
+                    # Grid from model_settings: keep for all levtypes for DE-ATOS,
+                    # only for pl otherwise.
+                    if levtype != 'pl' and model_name != 'DE-ATOS':
+                        request.pop('grid', None)
 
                     if model_name == "DE-LUMI":
                         if var_settings.get('is_accumulated', False):
