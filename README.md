@@ -10,7 +10,7 @@ for multiple NWP and ML models.  Built on **MARS**, **earthkit-data**,
 
 | Feature | Details |
 |---------|---------|
-| **Predefined models** | IFS Control, AIFS Single, AIFS ENS Control, IFS ENS, AIFS ENS, DE-LUMI, DE-ATOS |
+| **Predefined models** | IFS Control, AIFS Single, AIFS ENS Control, IFS ENS, AIFS ENS, DE-ATOS |
 | **Custom MARS models** | Add any model at runtime by specifying `class`, `type`, `stream`, `expver` and optional extra MARS keys |
 | **Interactive plot** | Plotly box-plots with hover info (bias, lead time, member index) |
 | **Static plot** | Matplotlib percentile boxes (1/10/25/50/75/90/99) with inset map |
@@ -69,9 +69,23 @@ Clone the repository and install the remaining Python dependencies (if needed):
 ```bash
 git clone https://git.ecmwf.int/scm/~ecm3468/diag_evo.git diag_evo
 cd diag_evo
+```
+All required packages are already pre-installed on ATOS.
+
+Start a JupyterHub session on ATOS.
+
+Open the notebook:
+[`forecast_evolution.ipynb`](forecast_evolution.ipynb)
+
+Select an appropriate kernel (e.g. Python 3.12.11).
+
+Run the notebook cells to start the diagnostic workflow.
+
+If you encounter errors related to missing Python packages, install the required dependencies by running:
+
+```bash
 pip install -r requirements.txt
 ```
-
 ---
 
 ## Quick start
@@ -92,7 +106,7 @@ from diag_evo import (
 # 1. Launch the interactive widget UI
 widgets_dict = setup_interface()
 
-# 2. (Optional) override settings programmatically
+# 2. (Optional) override settings programmatically. Important Note: When manually selecting a 'point', make sure it is within 'area_sub'
 # widgets_dict['config']['area_sub'] = [51.4, 5.7, 50.1, 9.4]
 # widgets_dict['config']['point'] = [50.88, 7.01]
 
@@ -171,10 +185,11 @@ Python code.
 ## Dependencies
 
 See [`requirements.txt`](requirements.txt).  Key dependencies:
+All should be preinstalled for ECMWF users.
 
 - Python ≥ 3.9
-- `metview` (system install)
-- `earthkit-data`
+- `metview`
+- `earthkit-data` 
 - `ipywidgets`, `ipyleaflet`
 - `plotly`, `matplotlib`, `cartopy`
 - `numpy`, `pandas`
