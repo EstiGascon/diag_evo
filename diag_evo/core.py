@@ -2004,7 +2004,7 @@ def plot_forecast_evolution_static(plot_data, widgets_dict, plot_dir,
 
     # Inset map — directly below the legend, same column width
     _map_h = 0.28
-    _map_y = 0.20
+    _map_y = 0.12
     map_n, map_w, map_s, map_e = area_sub
     center_lat = (map_n + map_s) / 2.0
     center_lon = (map_w + map_e) / 2.0
