@@ -24,41 +24,6 @@ import traceback
 import json
 
 
-def find_notebook_dir():
-    """Locate the directory containing the notebook (and the diag_evo package).
-
-    Checks several candidate paths (VS Code notebook path variable,
-    ``os.path.abspath('')``, ``os.getcwd()``) and returns the first one
-    that contains a ``diag_evo/`` sub-directory.
-
-    Returns
-    -------
-    str
-        Absolute path to the notebook directory.
-
-    Raises
-    ------
-    FileNotFoundError
-        If none of the candidate directories contain ``diag_evo/``.
-    """
-    import sys
-    candidates = []
-    # 1. VS Code injects the notebook path into this variable
-    caller_globals = sys._getframe(1).f_globals
-    vsc = caller_globals.get("__vsc_ipynb_file__")
-    if vsc:
-        candidates.append(os.path.dirname(os.path.realpath(vsc)))
-    # 2. Standard Jupyter: CWD is normally the notebook directory
-    candidates.append(os.path.abspath(""))
-    candidates.append(os.getcwd())
-    for d in candidates:
-        if os.path.isdir(os.path.join(d, "diag_evo")):
-            return d
-    raise FileNotFoundError(
-        "Could not locate the diag_evo package. "
-        "Make sure you run this notebook from within the diag_evo_v2 directory."
-    )
-
 from .variables import (
     load_variable_settings, get_base_var, get_level, get_variable_settings,
     convert_to_display, convert_from_display, get_grib_units,
