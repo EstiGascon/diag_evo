@@ -19,18 +19,52 @@ def load_variable_settings():
     except json.JSONDecodeError:
         raise ValueError("Invalid JSON format in variable_settings.json")
 
+def _split_var_level(var):
+    """Split a variable string into (shortName, level_int_or_None).
+
+    Uses the JSON settings to decide whether trailing digits are a pressure
+    level rather than hardcoding specific variable names.
+
+    Examples:
+        'z500'  -> ('z',  500)
+        'T850'  -> ('t',  850)
+        'q700'  -> ('q',  700)
+        '2t'    -> ('2t', None)
+        'tp'    -> ('tp', None)
+        ''      -> ('',   None)
+    """
+    if not var:
+        return '', None
+
+    settings = load_variable_settings()
+    low = var.lower()
+
+    # If the whole string is already a known key, no splitting needed
+    if low in settings:
+        return low, None
+
+    # Try progressively shorter prefixes to find a known pl variable
+    for i in range(1, len(low)):
+        prefix = low[:i]
+        suffix = low[i:]
+        if suffix.isdigit() and prefix in settings:
+            if settings[prefix].get('levtype') == 'pl':
+                return prefix, int(suffix)
+
+    # No match — return lowered whole string, no level
+    return low, None
+
+
 def get_base_var(var):
-    """Extract base variable name from input (e.g., 'T850' -> 't')"""
-    if var[0].upper() in ['T', 'Z'] and len(var) > 1 and var[1:].isdigit():
-        return var[0].lower()
-    else:
-        return var.lower()
-    
+    """Extract base variable name from input (e.g., 'T850' -> 't', '2t' -> '2t')."""
+    base, _ = _split_var_level(var)
+    return base
+
+
 def get_level(var):
-    """Extract level from variable name (e.g., 'T850' -> 850)"""
-    if var[0].upper() in ['T', 'Z'] and len(var) > 1 and var[1:].isdigit():
-        return int(var[1:])
-    return None
+    """Extract level from variable name (e.g., 'T850' -> 850, '2t' -> None)."""
+    _, level = _split_var_level(var)
+    return level
 
 def _resolve_param_id(var, settings):
     """If *var* is a numeric string (e.g. '167'), look it up by paramId.
@@ -256,13 +290,10 @@ def get_variable_display_name(var):
     If only the bare name is given (e.g. 'z') the level is omitted.
     """
     settings = get_variable_settings(var)
-    base_var = get_base_var(var)
 
-    if base_var in ['t', 'z']:
+    if settings.get('levtype') == 'pl':
         level = get_level(var)
         if level is not None:
             return f"{settings['description']} at {level}hPa ({settings['units']})"
-        # bare name — no level embedded
-        return f"{settings['description']} ({settings['units']})"
-    else:
-        return f"{settings['description']} ({settings['units']})" 
+
+    return f"{settings['description']} ({settings['units']})" 

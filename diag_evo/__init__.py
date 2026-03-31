@@ -24,6 +24,8 @@ from .core import (
     sanitize_mars_request,
 )
 
+from .map_plotting import plot_field_map
+
 from .settings import (
     register_custom_model,
     unregister_custom_model,
@@ -44,6 +46,8 @@ __all__ = [
     "setup_data_directories",
     "get_area_string",
     "sanitize_mars_request",
+    # Map plotting
+    "plot_field_map",
     # Model management
     "register_custom_model",
     "unregister_custom_model",

@@ -13,7 +13,7 @@ import numpy as np
 import ipywidgets as widgets
 import pandas as pd
 from IPython.display import display
-from ipyleaflet import Map, DrawControl
+from ipyleaflet import Map, DrawControl, basemaps, basemap_to_tiles
 import matplotlib.pyplot as plt
 import cartopy.crs as ccrs
 import cartopy.feature as cfeature
@@ -22,6 +22,40 @@ import earthkit.data
 import os
 import traceback
 import json
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeoutError
+
+# Default timeout (seconds) for a single MARS retrieval.
+# Set to 0 or None to disable.
+MARS_RETRIEVAL_TIMEOUT = 120
+
+
+def _retrieve_with_timeout(timeout=MARS_RETRIEVAL_TIMEOUT, *args, **kwargs):
+    """Call *earthkit.data.from_source* with an optional timeout.
+
+    Parameters
+    ----------
+    timeout : int | None
+        Maximum seconds to wait.  ``0`` or ``None`` disables the timeout.
+    *args, **kwargs
+        Forwarded to ``earthkit.data.from_source``.
+
+    Raises
+    ------
+    TimeoutError
+        If the retrieval exceeds *timeout* seconds.
+    """
+    if not timeout:
+        return earthkit.data.from_source(*args, **kwargs)
+
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        future = pool.submit(earthkit.data.from_source, *args, **kwargs)
+        try:
+            return future.result(timeout=timeout)
+        except FuturesTimeoutError:
+            raise TimeoutError(
+                f"MARS retrieval timed out after {timeout} seconds. "
+                "The data source may be temporarily unavailable."
+            )
 
 
 from .variables import (
@@ -91,6 +125,60 @@ def sanitize_mars_request(request):
     req.pop('ensemble', None)
 
     return req
+
+
+import re
+
+_AREA_DIR_RE = re.compile(
+    r'^(?P<var>.+)_N(?P<north>[^_]+)_W(?P<west>[^_]+)_S(?P<south>[^_]+)_E(?P<east>[^_]+)_(?P<date>\d{8})$'
+)
+
+
+def _parse_area_from_dirname(dirname):
+    """Parse [N, W, S, E] from a data directory name.
+
+    Returns (var, [N, W, S, E], date_str) or None if the name doesn't match.
+    """
+    m = _AREA_DIR_RE.match(dirname)
+    if not m:
+        return None
+    try:
+        area = [float(m.group('north')), float(m.group('west')),
+                float(m.group('south')), float(m.group('east'))]
+        return m.group('var'), area, m.group('date')
+    except ValueError:
+        return None
+
+
+def _find_existing_directory_for_point(base_path, var, date_str, point):
+    """Look for an existing data directory whose area contains *point*.
+
+    Scans ``base_path`` for directories matching ``{var}_*_{date_str}`` and
+    checks whether *point* ``[lat, lon]`` falls inside the stored area.
+
+    Returns ``(area_string, [N, W, S, E])`` if a match is found, or
+    ``(None, None)`` otherwise.
+    """
+    if point is None or not os.path.isdir(base_path):
+        return None, None
+
+    lat, lon = point
+    for entry in os.listdir(base_path):
+        parsed = _parse_area_from_dirname(entry)
+        if parsed is None:
+            continue
+        d_var, d_area, d_date = parsed
+        if d_var != var or d_date != date_str:
+            continue
+        n, w, s, e = d_area
+        if s <= lat <= n and w <= lon <= e:
+            # Verify the directory actually contains grib files
+            grib_dir = os.path.join(base_path, entry, "grib_files")
+            if os.path.isdir(grib_dir) and os.listdir(grib_dir):
+                print(f"Reusing existing data directory (point {lat},{lon} is inside "
+                      f"area N{n}/W{w}/S{s}/E{e}): {entry}")
+                return get_area_string(d_area), d_area
+    return None, None
 
 
 def setup_data_directories(base_path, var, area_str, date_str):
@@ -581,8 +669,12 @@ def create_widgets():
     # Create output widget to display results
     output = widgets.Output()
 
-    # Create the map
-    m = Map(center=(49, 10.5), zoom=6)
+    # Create the map (use CartoDB Positron — no Referer header required)
+    m = Map(
+        center=(49, 10.5),
+        zoom=6,
+        basemap=basemaps.CartoDB.Positron,
+    )
     draw_control = DrawControl()
     m.add_control(draw_control)
 
@@ -692,10 +784,10 @@ def handle_draw(target, action, geo_json):
         if geo_json['geometry']['type'] == 'Point':
             # For a point, create a small box around it
             point = coords  # Store point coordinates globally
-            west = point[0] - 0.5
-            east = point[0] + 0.5
-            south = point[1] - 0.5
-            north = point[1] + 0.5
+            west = point[0] - 3
+            east = point[0] + 3
+            south = point[1] - 3
+            north = point[1] + 3
             point.reverse()
             
             # Create a rectangle layer to highlight the area
@@ -865,11 +957,19 @@ def retrieve_and_store_data(widgets_dict, base_path):
     # Setup data directories
     area_str = get_area_string(area_sub)
     date_str = valid_date.strftime("%Y%m%d")
+
+    # If a point is selected, check whether it falls inside an already-retrieved area
+    point = widgets_dict['config']['point']
+    if point is not None:
+        reuse_area_str, reuse_area = _find_existing_directory_for_point(base_path, param, date_str, point)
+        if reuse_area_str is not None:
+            area_str = reuse_area_str
+            area_sub = reuse_area  # use the existing directory's area for MARS requests
+
     grib_dir, obs_dir, plot_dir = setup_data_directories(base_path, param, area_str, date_str)
     data_dir = grib_dir  # Store for later use
 
     n_members = widgets_dict['config']['n_members']
-    point = widgets_dict['config']['point']
     # Calculate distances using haversine formula
     def haversine_distance(lat1, lon1, lat2, lon2):
         from math import radians, sin, cos, sqrt, atan2
@@ -1032,7 +1132,7 @@ def retrieve_and_store_data(widgets_dict, base_path):
                 if levtype != 'pl':
                     request.pop('grid', None)
                 
-                analysis = earthkit.data.from_source("mars", request)
+                analysis = _retrieve_with_timeout(MARS_RETRIEVAL_TIMEOUT, "mars", request)
                 analysis.save(analysis_file)
                 analysis = mv.read(analysis_file)
 
@@ -1078,7 +1178,7 @@ def retrieve_and_store_data(widgets_dict, base_path):
             if levtype != 'pl':
                 request.pop('grid', None)
             
-            data_clim_em = earthkit.data.from_source("mars", request)
+            data_clim_em = _retrieve_with_timeout(MARS_RETRIEVAL_TIMEOUT, "mars", request)
             data_clim_em.save(clim_file)
             data_clim_em = mv.read(clim_file)
 
@@ -1123,10 +1223,13 @@ def retrieve_and_store_data(widgets_dict, base_path):
     data_df['climatology'] = None
 
     # Retrieve data for each model, forecast date, and step
+    timed_out_models = set()  # models that hit a timeout — skip for remaining steps
     for idx, (fc_date, step) in enumerate(zip(forecast_dates, forecast_steps)):
         print(f"\nRetrieving data for forecast date {fc_date} at step {step}...")
 
         for model_name in widgets_dict['model_widgets'].value:
+            if model_name in timed_out_models:
+                continue
             print(f"Retrieving {model_name}...")
             if model_name in ['DE-LUMI', 'DE-ATOS']:
                 if fc_date.hour != 0:
@@ -1166,12 +1269,13 @@ def retrieve_and_store_data(widgets_dict, base_path):
                         lumi_address = request.pop("address", None)
                         request = sanitize_mars_request(request)
                         print(f"[DE-LUMI request] {request}")
-                        data = earthkit.data.from_source(
+                        data = _retrieve_with_timeout(
+                            MARS_RETRIEVAL_TIMEOUT,
                             "polytope",
                             "ecmwf-destination-earth",
                             request,
                             address=lumi_address,
-                            stream=False
+                            stream=False,
                         )
                         data.save(model_file)
                         data = mv.read(model_file)
@@ -1200,7 +1304,7 @@ def retrieve_and_store_data(widgets_dict, base_path):
                         # Sanitize: enforce MARS keyword interdependencies
                         request = sanitize_mars_request(request)
                         print(f"[{model_name} request] {request}")
-                        data = earthkit.data.from_source("mars", request)
+                        data = _retrieve_with_timeout(MARS_RETRIEVAL_TIMEOUT, "mars", request)
                         data.save(model_file)
                         data = mv.read(model_file)
 
@@ -1269,9 +1373,14 @@ def retrieve_and_store_data(widgets_dict, base_path):
                         # Points and areas
                         if point:
                             data_point = mv.nearest_gridpoint(data, point)
+                            # Filter out None values (point outside grid)
+                            valid_vals = [v for v in data_point if v is not None]
+                            if not valid_vals:
+                                print(f"Warning: nearest_gridpoint returned no valid values for {model_name} — point may be outside the data grid")
+                                continue
                             nearest_gridinfo_dict[model_name+'_nearest']= mv.nearest_gridpoint_info(data[0], point)[0]
-                            data_df.at[idx, f'{model_name}_ENS_mem'] = np.array(data_point)
-                            mean_val = np.mean(np.array(data_point))
+                            data_df.at[idx, f'{model_name}_ENS_mem'] = np.array(valid_vals)
+                            mean_val = np.mean(valid_vals)
                         else:
                             data_df.at[idx, f'{model_name}_ENS_mem'] = data
                             data_df.at[idx, f'{model_name}_ENS_mem_area'] = mv.integrate(data, area_sub)
@@ -1286,7 +1395,7 @@ def retrieve_and_store_data(widgets_dict, base_path):
                         print(f"Area mean value: {area_val}")
 
                         if point:
-                            ens_area = list(data_point)
+                            ens_area = list(valid_vals)
                         else:
                             ens_area = [mv.integrate(member, area_sub) for member in data]
                         data_df.at[idx, f'{model_name}_ens_area'] = ens_area
@@ -1296,11 +1405,23 @@ def retrieve_and_store_data(widgets_dict, base_path):
                         data_df.at[idx, f'{model_name}_field'] = data
                         if point:
                             area_val = mv.nearest_gridpoint(data, point)
+                            if area_val is None:
+                                print(f"Warning: nearest_gridpoint returned None for {model_name} — point may be outside the data grid")
+                                continue
                             nearest_gridinfo_dict[model_name+'_nearest']= mv.nearest_gridpoint_info(data[0], point)[0]
                         else:
                             area_val = mv.integrate(data, area_sub)
                         data_df.at[idx, f'{model_name}_area'] = area_val
                         print(f"value: {area_val}")
+
+            except TimeoutError as e:
+                print(
+                    f"\n{'='*60}\n"
+                    f"TIMEOUT: {model_name} for step {step} — skipping this model for all remaining steps.\n"
+                    f"{str(e)}\n"
+                    f"{'='*60}"
+                )
+                timed_out_models.add(model_name)
 
             except Exception as e:
                 error_msg = (
@@ -1361,7 +1482,8 @@ def retrieve_and_store_data(widgets_dict, base_path):
         'analysis_area': analysis_area,
         'reference': reference,
         'var_settings': var_settings,
-        'nearest_gridinfo_dict': nearest_gridinfo_dict
+        'nearest_gridinfo_dict': nearest_gridinfo_dict,
+        'base_path': base_path,
     }
     
     return plot_data 
