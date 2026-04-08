@@ -2,7 +2,7 @@
     "models": {
         "IFS Control": {
             "class": "od",
-            "expver": 1,
+            "expver": "1",
             "stream": "oper",
             "type": "fc",
             "grid": "O1280",
@@ -14,7 +14,7 @@
             "stream": "oper",
             "model": "aifs-single",
             "type": "fc",
-            "grid": "O320",
+            "grid": "N320",
             "ensemble": false
         },
         "AIFS ENS Control": {
@@ -23,7 +23,7 @@
             "stream": "enfo",
             "model": "aifs-ens",
             "type": "cf",
-            "grid": "O320",
+            "grid": "N320",
             "ensemble": false
         },
         "IFS ENS": {
@@ -41,7 +41,7 @@
             "model": "aifs-ens",
             "type": "pf",
             "number": [1, "TO", 50],
-            "grid": "O320",
+            "grid": "N320",
             "ensemble": true
         },
         "DE-ATOS": {
@@ -50,6 +50,52 @@
             "stream": "oper",
             "type": "fc",
             "grid": "O2560",
+            "ensemble": false
+        },
+        "IFS_50r1 Control": {
+            "class": "od",
+            "expver": "80",
+            "stream": "oper",
+            "type": "fc",
+            "grid": "O1280",
+            "ensemble": false
+        },
+        "IFS_50r1 ENS": {
+            "class": "od",
+            "expver": "80",
+            "stream": "enfo",
+            "type": "pf",
+            "number": [1, "TO", 50],
+            "grid": "O1280",
+            "ensemble": true
+        },
+        "AIFSv2 Single": {
+            "class": "ai",
+            "expver": "105",
+            "stream": "oper",
+            "model": "aifs-single",
+            "type": "fc",
+            "grid": "N320",
+            "ensemble": false
+        },
+        "AIFSv2 ENS": {
+            "class": "ai",
+            "expver": "105",
+            "stream": "enfo",
+            "model": "aifs-ens",
+            "type": "pf",
+            "number": [1, "TO", 50],
+            "grid": "N320",
+            "ensemble": true
+        },
+        "AIFSv2 ENS Control": {
+            "class": "rd",
+            "expver": "j0ia",
+            "stream": "oper",
+            "model": "aifs-ens",
+            "type": "fc",
+            "database": "fdb",
+            "grid": "N320",
             "ensemble": false
         }
     },
@@ -61,9 +107,9 @@
     },
     "climatology": {
         "class": "ea",
-        "expver": 1,
+        "expver": "1",
         "stream": "dacl",
         "type": "em",
-        "grid": "O320"
+        "grid": "N320"
     }
 } 

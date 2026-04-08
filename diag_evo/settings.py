@@ -11,6 +11,10 @@ from typing import Dict, Any, List, Optional
 _custom_models: Dict[str, Dict[str, Any]] = {}
 _custom_plot_settings: Dict[str, Dict[str, Any]] = {}
 
+# Module-level caches for JSON files (avoid re-reading from disk every call)
+_cache_model_settings: Optional[Dict[str, Any]] = None
+_cache_plot_settings: Optional[Dict[str, Any]] = None
+
 # Default colour cycle used when the user does not pick a colour
 _DEFAULT_CUSTOM_COLORS = [
     "#e377c2", "#bcbd22", "#17becf", "#ff7f0e",
@@ -20,15 +24,34 @@ _color_idx = 0
 
 
 def load_settings(file_name: str) -> Dict[str, Any]:
-    """Load settings from a JSON file."""
+    """Load settings from a JSON file, with module-level caching."""
+    global _cache_model_settings, _cache_plot_settings
+
+    # Use cache when available
+    if file_name == 'model_settings.json' and _cache_model_settings is not None:
+        import copy
+        return copy.deepcopy(_cache_model_settings)
+    if file_name == 'plot_settings.json' and _cache_plot_settings is not None:
+        import copy
+        return copy.deepcopy(_cache_plot_settings)
+
     settings_path = os.path.join(os.path.dirname(__file__), 'config', file_name)
     try:
         with open(settings_path, 'r') as f:
-            return json.load(f)
+            data = json.load(f)
     except FileNotFoundError:
         raise FileNotFoundError(f"{file_name} file not found at {settings_path}")
     except json.JSONDecodeError:
         raise ValueError(f"Invalid JSON format in {file_name}")
+
+    # Populate cache
+    if file_name == 'model_settings.json':
+        _cache_model_settings = data
+    elif file_name == 'plot_settings.json':
+        _cache_plot_settings = data
+
+    import copy
+    return copy.deepcopy(data)
 
 
 # ---------------------------------------------------------------------------
@@ -102,17 +125,33 @@ def _next_default_color() -> str:
     return color
 
 
+def _hex_to_rgb(color: str):
+    """Parse a hex colour string (#RRGGBB) into (r, g, b) ints.
+
+    Returns ``None`` if the colour is not in ``#RRGGBB`` format (e.g. a named
+    colour like ``'red'``).
+    """
+    if (isinstance(color, str) and color.startswith('#')
+            and len(color) == 7
+            and all(c in '0123456789abcdefABCDEF' for c in color[1:])):
+        return int(color[1:3], 16), int(color[3:5], 16), int(color[5:7], 16)
+    return None
+
+
 def _generate_default_plot_settings(model_name: str, is_ensemble: bool,
                                      color: Optional[str] = None) -> Dict[str, Any]:
     """Generate sensible default plot settings for a custom model."""
     if color is None:
         color = _next_default_color()
 
+    rgb = _hex_to_rgb(color)
+
     if is_ensemble:
+        fillcolor = f"rgba({rgb[0]}, {rgb[1]}, {rgb[2]}, 0.3)" if rgb else "rgba(128, 128, 128, 0.3)"
         return {
             "color": color,
             "box": {
-                "fillcolor": f"rgba({int(color[1:3],16)}, {int(color[3:5],16)}, {int(color[5:7],16)}, 0.3)",
+                "fillcolor": fillcolor,
                 "marker_color": color,
                 "width": 0.35
             },
@@ -206,12 +245,14 @@ def register_custom_model(name: str, retrieval_args: Dict[str, Any],
     if is_ensemble:
         mean_name = f"{name} Mean"
         mean_color = color or ps["color"]
+        rgb = _hex_to_rgb(mean_color)
+        marker_rgba = f"rgba({rgb[0]}, {rgb[1]}, {rgb[2]}, 0.7)" if rgb else mean_color
         _custom_plot_settings[mean_name] = {
             "color": mean_color,
             "marker": {
                 "symbol": "star",
                 "size": 12,
-                "color": f"rgba({int(mean_color[1:3],16)}, {int(mean_color[3:5],16)}, {int(mean_color[5:7],16)}, 0.7)",
+                "color": marker_rgba,
                 "line": {
                     "color": mean_color,
                     "width": 2

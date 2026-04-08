@@ -14,17 +14,21 @@ Quick start
 >>> plot_forecast_evolution(plot_data, widgets_dict, plot_dir)
 """
 
+from .ui import setup_interface
+
 from .core import (
-    setup_interface,
     retrieve_and_store_data,
-    plot_forecast_evolution,
-    plot_forecast_evolution_static,
     setup_data_directories,
     get_area_string,
     sanitize_mars_request,
 )
 
-from .map_plotting import plot_field_map
+from .plotting import (
+    plot_forecast_evolution,
+    plot_forecast_evolution_static,
+)
+
+from .map_plotting import plot_field_map, plot_obs_map, plot_analysis_map
 
 from .settings import (
     register_custom_model,
@@ -38,16 +42,20 @@ from .settings import (
 )
 
 __all__ = [
-    # Core workflow
+    # UI
     "setup_interface",
+    # Core workflow
     "retrieve_and_store_data",
-    "plot_forecast_evolution",
-    "plot_forecast_evolution_static",
     "setup_data_directories",
     "get_area_string",
     "sanitize_mars_request",
+    # Plotting
+    "plot_forecast_evolution",
+    "plot_forecast_evolution_static",
     # Map plotting
     "plot_field_map",
+    "plot_obs_map",
+    "plot_analysis_map",
     # Model management
     "register_custom_model",
     "unregister_custom_model",

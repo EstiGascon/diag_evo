@@ -11,7 +11,7 @@ import metview as mv
 from datetime import datetime, timedelta
 
 from .variables import get_base_var, get_variable_settings, get_grib_units
-from .settings import get_model_retrieval_settings
+from .settings import get_model_retrieval_settings, get_analysis_settings
 
 # ---------------------------------------------------------------------------
 # Contour presets keyed by variable "category"
@@ -26,9 +26,8 @@ _PRECIP_COLOURS = [
     "rgb(1,0.45,0)", "red", "rgb(0.8,0,0)", "burgundy",
 ]
 
-_TEMP_LEVELS = list(range(-50, 60, 2))
+_TEMP_LEVELS = list(range(-40, 50, 2))
 _TEMP_COLOURS = [
-    "rgb(76,76,76)", "rgb(128,128,128)", "rgb(153,153,153)", "rgb(179,179,179)", "rgb(204,204,204)",
     "rgb(204,158,134)", "rgb(192,137,107)", "rgb(182,117,82)", "rgb(151,95,64)", "rgb(124,78,52)",
     "rgb(89,0,153)", "rgb(128,0,230)", "rgb(153,51,255)", "rgb(192,102,255)", "rgb(217,153,255)",
     "rgb(255,192,255)", "rgb(255,151,255)", "rgb(225,51,225)", "rgb(174,51,174)", "rgb(122,51,122)",
@@ -38,8 +37,7 @@ _TEMP_COLOURS = [
     "rgb(255,153,0)", "rgb(255,128,0)", "rgb(255,96,0)", "rgb(255,0,0)", "rgb(204,0,0)",
     "rgb(204,61,110)", "rgb(255,0,255)", "rgb(255,151,255)", "rgb(215,121,255)",
     "rgb(174,0,249)", "rgb(125,0,179)", "rgb(151,95,64)", "rgb(182,117,82)",
-    "rgb(192,137,107)", "rgb(204,158,134)", "rgb(204,204,204)", "rgb(179,179,179)",
-    "rgb(153,153,153)", "rgb(128,128,128)", "rgb(76,76,76)",
+    "rgb(192,137,107)", "rgb(204,158,134)",
 ]
 
 _GEOPOT_COLOURS = [
@@ -104,6 +102,17 @@ _PRESSURE_COLOURS = [
     "rgb(0,0,0)",
 ]
 
+# Wind speed levels & colours (based on ecCharts sh_mc_wind_f0t80)
+_WIND_LEVELS = [0, 2, 4, 6, 8, 10, 12, 15, 18, 21, 25, 30, 35, 40, 45, 50, 80]
+_WIND_COLOURS = [
+    "RGB(0.85,0.99,0.93)", "RGB(0.45,0.98,0.96)", "RGB(0,0.73,1)",
+    "RGB(0,0.18,1)", "RGB(0.03,0.01,0.64)", "RGB(0.16,0.99,0.14)",
+    "RGB(0.57,1,0)", "RGB(0.83,1,0)", "RGB(1,0.98,0)",
+    "RGB(1,0.85,0)", "RGB(1,0.63,0)", "RGB(1,0.4,0)",
+    "RGB(1,0.12,0)", "RGB(1,0,0.67)", "RGB(0.85,0,1)",
+    "RGB(0.47,0.01,0.55)",
+]
+
 
 def _get_var_category(param):
     """Map a param shortName to a contour category."""
@@ -118,7 +127,7 @@ def _get_var_category(param):
         return 'cloud_cover'
     if base == 'msl':
         return 'pressure'
-    if base in ('10u', '10v', '10si', '10fg'):
+    if base in ('10u', '10v', '10si', '10fg', '100u', '100v', '100si', 'u', 'v', 'ws'):
         return 'wind'
     return 'default'
 
@@ -153,7 +162,9 @@ def _build_contour(param, level=None):
         lr = _GEOPOT_LEVEL_RANGES.get(level, {"min": 0, "max": 20800, "interval": 40})
         return mv.mcont(
             legend="on", contour="on",
-            contour_line_colour="black", contour_line_thickness=1,
+            contour_line_colour="charcoal", contour_line_thickness=2,
+            contour_highlight_colour="charcoal",
+            contour_highlight_thickness=4,
             contour_level_selection_type="interval",
             contour_interval=lr["interval"],
             contour_label="on", contour_label_height=0.4,
@@ -179,15 +190,26 @@ def _build_contour(param, level=None):
 
     if cat == 'pressure':
         return mv.mcont(
-            legend="on", contour="on",
-            contour_line_colour="black", contour_line_thickness=1,
-            contour_level_selection_type="level_list",
-            contour_level_list=_PRESSURE_LEVELS,
+            legend="off", contour="on",
+            contour_line_colour="navy", contour_line_thickness=1.7,
+            contour_highlight_colour="navy",
+            contour_highlight_thickness=3,
+            contour_level_selection_type="interval",
+            contour_interval=4,
             contour_label="on", contour_label_height=0.4,
-            contour_shade="on",
+            contour_shade="off",
+        )
+
+    if cat == 'wind':
+        return mv.mcont(
+            legend="on", contour="off",
+            contour_level_selection_type="level_list",
+            contour_level_list=_WIND_LEVELS,
+            contour_label="off", contour_shade="on",
             contour_shade_colour_method="list",
+            contour_shade_method="area_fill",
             contour_shade_technique="grid_shading",
-            contour_shade_colour_list=_PRESSURE_COLOURS,
+            contour_shade_colour_list=_WIND_COLOURS,
         )
 
     # Default fallback
@@ -233,20 +255,68 @@ def _build_geoview(area, plot_radius=2):
     )
 
 
-def _build_legend(units):
-    """Return a styled ``mv.mlegend``."""
+def _build_legend(param, units):
+    """Return a styled legend for shaded fields."""
+    if _get_var_category(param) == 'pressure':
+        return None
     return mv.mlegend(
         legend_text_colour="black",
-        legend_automatic_position="right",
         legend_units_text=units,
-        legend_text_font_style="bold",
-        legend_text_font_size=0.35,
-        legend_entry_text_width=50,
+        legend_text_font_size=0.31,
     )
 
 
+def _format_mars_keywords(model_name):
+    """Return a compact MARS keyword string for the title (values only, pipe-separated)."""
+    settings = get_model_retrieval_settings(model_name)
+    exclude = {'ensemble', 'number', 'grid'}
+    preferred_order = ['class', 'type', 'stream', 'expver', 'model', 'database']
+
+    parts = []
+    seen = set()
+
+    for key in preferred_order:
+        if key in settings and settings[key] not in (None, ''):
+            parts.append(str(settings[key]))
+            seen.add(key)
+
+    for key in sorted(settings):
+        if key in seen or key in exclude:
+            continue
+        value = settings[key]
+        if value in (None, ''):
+            continue
+        parts.append(str(value))
+
+    return ' | '.join(parts)
+
+
+def _format_settings_keywords(settings):
+    """Return a compact keyword string from a raw settings dict (values only, pipe-separated)."""
+    exclude = {'grid'}
+    preferred_order = ['class', 'type', 'stream', 'expver']
+
+    parts = []
+    seen = set()
+
+    for key in preferred_order:
+        if key in settings and settings[key] not in (None, ''):
+            parts.append(str(settings[key]))
+            seen.add(key)
+
+    for key in sorted(settings):
+        if key in seen or key in exclude:
+            continue
+        value = settings[key]
+        if value in (None, ''):
+            continue
+        parts.append(str(value))
+
+    return '|'.join(parts)
+
+
 def _build_title(param, model_name, fc_date, step, valid_date, member=None,
-                 units='', level=None):
+                 units='', level=None, acc_period=None, is_ensemble=False):
     """Return an ``mv.mtext`` title block."""
     var_desc = param
     try:
@@ -256,19 +326,22 @@ def _build_title(param, model_name, fc_date, step, valid_date, member=None,
         pass
 
     level_str = f" at {level} hPa" if level else ""
-    line1 = f"{var_desc}{level_str} ({units})"
-    line2 = (f"Init: {fc_date.strftime('%Y-%m-%d %H:%M')} "
-             f"T+{step}h  Valid: {valid_date.strftime('%Y-%m-%d %H:%M')}")
+    acc_str = f" ({acc_period}h)" if acc_period else ""
+    line1 = f"{var_desc}{level_str}{acc_str} ({units})"
     member_str = ""
     if member is not None:
         member_str = f" member {member}" if isinstance(member, int) else f" {member}"
-    line3 = f"{model_name}{member_str}"
+    elif is_ensemble:
+        member_str = " member 1"
+    line2 = (f"{model_name}{member_str}  |  "
+             f"Init: {fc_date.strftime('%Y-%m-%d %H:%M')} "
+             f"T+{step}h  Valid: {valid_date.strftime('%Y-%m-%d %H:%M')}")
+    line3 = _format_mars_keywords(model_name)
     return mv.mtext(
-        text_line_count=4,
+        text_line_count=3,
         text_line_1=line1,
         text_line_2=line2,
         text_line_3=line3,
-        text_line_4=" ",
         text_font_size=0.6,
     )
 
@@ -277,48 +350,361 @@ def _build_title(param, model_name, fc_date, step, valid_date, member=None,
 # Observation overlay
 # ---------------------------------------------------------------------------
 
-_OBS_TEMP_MIN = list(range(-50, 58, 2))
-_OBS_TEMP_MAX = list(range(-48, 60, 2))
+# Obs bins must match the model contour intervals so colours align.
+_OBS_TEMP_MIN = list(range(-40, 48, 2))   # same as _TEMP_LEVELS[:-1]
+_OBS_TEMP_MAX = list(range(-38, 50, 2))   # same as _TEMP_LEVELS[1:]
 
 _OBS_PRECIP_MIN = [0.5, 1, 2, 3, 4, 5, 6, 8, 10, 15, 20, 25, 30, 40, 50, 75, 100, 200]
 _OBS_PRECIP_MAX = [1, 2, 3, 4, 5, 6, 8, 10, 15, 20, 25, 30, 40, 50, 75, 100, 200, 300]
 _OBS_PRECIP_HEIGHTS = [0.5, 0.6, 0.6, 0.6, 0.6, 0.7, 0.7, 0.7, 0.7,
                        0.7, 0.7, 0.7, 0.7, 0.7, 0.7, 0.8, 0.9, 1.0]
 
+# Wind speed obs bins (one fewer than _WIND_LEVELS boundaries)
+_OBS_WIND_MIN = [0, 2, 4, 6, 8, 10, 12, 15, 18, 21, 25, 30, 35, 40, 45, 50]
+_OBS_WIND_MAX = [2, 4, 6, 8, 10, 12, 15, 18, 21, 25, 30, 35, 40, 45, 50, 80]
 
-def _build_obs_marker(param):
-    """Return an ``mv.psymb`` for observation overlay, or None."""
+
+def _build_obs_marker(param, legend="off"):
+    """Return an ``mv.msymb`` for observation overlay (filled circles with outline), or None."""
     cat = _get_var_category(param)
     if cat == 'temperature':
-        return mv.psymb(
+        return mv.msymb(
             symbol_type="marker", symbol_table_mode="on",
-            legend="off", symbol_quality="high",
+            legend=legend,
             symbol_min_table=_OBS_TEMP_MIN,
             symbol_max_table=_OBS_TEMP_MAX,
             symbol_marker_table=[15],
             symbol_colour_table=_TEMP_COLOURS,
             symbol_height_table=[0.4] * len(_OBS_TEMP_MIN),
+            symbol_outline="on",
+            symbol_outline_colour="black",
+            symbol_outline_thickness=1,
         )
     if cat == 'precipitation':
-        return mv.psymb(
+        return mv.msymb(
             symbol_type="marker", symbol_table_mode="on",
-            legend="off", symbol_quality="high",
+            legend=legend,
             symbol_min_table=_OBS_PRECIP_MIN,
             symbol_max_table=_OBS_PRECIP_MAX,
             symbol_marker_table=[15],
             symbol_colour_table=_PRECIP_COLOURS,
             symbol_height_table=_OBS_PRECIP_HEIGHTS,
+            symbol_outline="on",
+            symbol_outline_colour="black",
+            symbol_outline_thickness=1,
+        )
+    if cat == 'wind':
+        return mv.msymb(
+            symbol_type="marker", symbol_table_mode="on",
+            legend=legend,
+            symbol_min_table=_OBS_WIND_MIN,
+            symbol_max_table=_OBS_WIND_MAX,
+            symbol_marker_table=[15],
+            symbol_colour_table=_WIND_COLOURS,
+            symbol_height_table=[0.4] * len(_OBS_WIND_MIN),
+            symbol_outline="on",
+            symbol_outline_colour="black",
+            symbol_outline_thickness=1,
+        )
+    return None
+
+
+def _build_model_marker(param, legend="off"):
+    """Return an ``mv.msymb`` for model geopoint overlay (filled squares with thick outline), or None."""
+    cat = _get_var_category(param)
+    if cat == 'temperature':
+        return mv.msymb(
+            symbol_type="marker", symbol_table_mode="on",
+            legend=legend,
+            symbol_min_table=_OBS_TEMP_MIN,
+            symbol_max_table=_OBS_TEMP_MAX,
+            symbol_marker_table=[18],
+            symbol_colour_table=_TEMP_COLOURS,
+            symbol_height_table=[0.5] * len(_OBS_TEMP_MIN),
+            symbol_outline="on",
+            symbol_outline_colour="charcoal",
+            symbol_outline_thickness=2,
+        )
+    if cat == 'precipitation':
+        return mv.msymb(
+            symbol_type="marker", symbol_table_mode="on",
+            legend=legend,
+            symbol_min_table=_OBS_PRECIP_MIN,
+            symbol_max_table=_OBS_PRECIP_MAX,
+            symbol_marker_table=[18],
+            symbol_colour_table=_PRECIP_COLOURS,
+            symbol_height_table=_OBS_PRECIP_HEIGHTS,
+            symbol_outline="on",
+            symbol_outline_colour="charcoal",
+            symbol_outline_thickness=2,
+        )
+    if cat == 'wind':
+        return mv.msymb(
+            symbol_type="marker", symbol_table_mode="on",
+            legend=legend,
+            symbol_min_table=_OBS_WIND_MIN,
+            symbol_max_table=_OBS_WIND_MAX,
+            symbol_marker_table=[18],
+            symbol_colour_table=_WIND_COLOURS,
+            symbol_height_table=[0.5] * len(_OBS_WIND_MIN),
+            symbol_outline="on",
+            symbol_outline_colour="charcoal",
+            symbol_outline_thickness=2,
         )
     return None
 
 
 # ---------------------------------------------------------------------------
-# Public API
+# Internal helpers for directory / file resolution
+# ---------------------------------------------------------------------------
+
+def _resolve_data_dir(plot_data, widgets_dict):
+    """Resolve the data directory name for the current config.
+
+    Returns (dir_name, base_path, area_sub) — *area_sub* may be updated if
+    a point was matched against an existing directory.
+    """
+    from .core import (get_area_string, _find_existing_directory_for_point)
+
+    config = widgets_dict['config']
+    param = config['param']
+    valid_date = config['valid_date']
+    area_sub = list(config['area_sub'])
+    base_path = plot_data.get('base_path', '')
+    date_str = valid_date.strftime("%Y%m%d")
+    time_str = f"{valid_date.hour:02d}00"
+    area_str = get_area_string(area_sub)
+
+    point = config.get('point')
+    if point is not None:
+        reuse_area_str, reuse_area = _find_existing_directory_for_point(
+            base_path, param, date_str, point, time_str,
+        )
+        if reuse_area_str is not None:
+            area_str = reuse_area_str
+            area_sub = reuse_area
+
+    dir_name_new = f"{param}_{area_str}_{date_str}_{time_str}"
+    dir_name_old = f"{param}_{area_str}_{date_str}"
+    if os.path.isdir(os.path.join(base_path, dir_name_new)):
+        dir_name = dir_name_new
+    elif os.path.isdir(os.path.join(base_path, dir_name_old)):
+        dir_name = dir_name_old
+    else:
+        dir_name = dir_name_new
+
+    return dir_name, base_path, area_sub
+
+
+def _load_obs_geopoints(base_path, dir_name, param, date_str, time_str):
+    """Load observation geopoints from disk, returning (geopoints, path) or (None, None)."""
+    obs_dir = os.path.join(base_path, dir_name, "obs_files")
+    obs_file = os.path.join(obs_dir, f"STVL_{param}_{date_str}_{time_str}.grib")
+    if os.path.exists(obs_file):
+        return mv.read(obs_file), obs_file
+    return None, None
+
+
+# ---------------------------------------------------------------------------
+# Public API — observation-only map
+# ---------------------------------------------------------------------------
+
+def plot_obs_map(plot_data, widgets_dict, plot_radius=0, export_png=True):
+    """Plot observation geopoints on a map (no model field).
+
+    Parameters
+    ----------
+    plot_data : dict
+        The dict returned by ``retrieve_and_store_data``.
+    widgets_dict : dict
+        The widgets dictionary with ``config`` sub-dict.
+    plot_radius : float
+        Degrees to pad around the data area for the map view.
+    export_png : bool
+        If True, save a PNG to the plot directory.
+    """
+    config = widgets_dict['config']
+    param = config['param']
+    valid_date = config['valid_date']
+    date_str = valid_date.strftime("%Y%m%d")
+    time_str = f"{valid_date.hour:02d}00"
+
+    dir_name, base_path, area_sub = _resolve_data_dir(plot_data, widgets_dict)
+
+    obs_data, obs_file = _load_obs_geopoints(base_path, dir_name, param, date_str, time_str)
+    if obs_data is None:
+        print(f"No observation file found for {param} at {date_str}_{time_str}")
+        return
+
+    # Unit conversion for temperature obs (STVL stores in K)
+    base = get_base_var(param)
+    if base in ('2t', '2d', 't'):
+        from .variables import convert_to_display
+        obs_data = convert_to_display(obs_data, param, grib_units='K')
+
+    obs_marker = _build_obs_marker(param, legend="on")
+    if obs_marker is None:
+        # Fallback generic marker
+        obs_marker = mv.msymb(
+            symbol_type="marker", symbol_table_mode="off",
+            legend="on",
+            symbol_marker_index=15,
+            symbol_colour="black",
+            symbol_height=0.4,
+            symbol_outline="on",
+            symbol_outline_colour="black",
+            symbol_outline_thickness=1,
+        )
+
+    units_str = ''
+    try:
+        vs = get_variable_settings(param)
+        units_str = vs.get('units', '')
+    except (ValueError, KeyError):
+        pass
+
+    geoview = _build_geoview(area_sub, plot_radius)
+    legend = _build_legend(param, units_str)
+    legend_objects = [] if legend is None else [legend]
+
+    title = mv.mtext(
+        text_line_count=2,
+        text_line_1=f"Observations — {param} ({units_str})",
+        text_line_2=f"Valid: {valid_date.strftime('%Y-%m-%d %H:%M')}",
+        text_font_size=0.6,
+    )
+
+    if export_png:
+        from .core import _safe_label
+        plot_dir = os.path.join(base_path, dir_name, "plot_files")
+        os.makedirs(plot_dir, exist_ok=True)
+        png_name = os.path.join(plot_dir, f"map_obs_{param}_{date_str}_{time_str}")
+        mv.setoutput(mv.png_output(output_name=png_name, output_font_scale=1.6, output_width=2200))
+        mv.plot(obs_data, obs_marker, geoview, *legend_objects, title)
+        print(f"Obs map exported to: {png_name}.png")
+    else:
+        mv.plot(obs_data, obs_marker, geoview, *legend_objects, title)
+
+
+# ---------------------------------------------------------------------------
+# Public API — analysis map
+# ---------------------------------------------------------------------------
+
+def plot_analysis_map(plot_data, widgets_dict, plot_radius=0, export_png=True,
+                      overlay_obs=False):
+    """Plot the analysis field on a map.
+
+    Parameters
+    ----------
+    plot_data : dict
+        The dict returned by ``retrieve_and_store_data``.
+    widgets_dict : dict
+        The widgets dictionary with ``config`` sub-dict.
+    plot_radius : float
+        Degrees to pad around the data area for the map view.
+    export_png : bool
+        If True, save a PNG to the plot directory.
+    overlay_obs : bool
+        If True, overlay STVL observations on the map (when available).
+    """
+    from .core import _reference_grib_filename, _get_var_settings_safe
+
+    config = widgets_dict['config']
+    param = config['param']
+    valid_date = config['valid_date']
+    levtype = config['levtype']
+    level = config.get('level')
+    date_str = valid_date.strftime("%Y%m%d")
+    time_str = f"{valid_date.hour:02d}00"
+
+    dir_name, base_path, area_sub = _resolve_data_dir(plot_data, widgets_dict)
+    grib_dir = os.path.join(base_path, dir_name, "grib_files")
+
+    # Locate analysis GRIB file
+    analysis_settings = get_analysis_settings()
+    analysis_file = os.path.join(grib_dir, _reference_grib_filename(
+        'Analysis', param, analysis_settings, levtype, level, date_str, time_str))
+
+    if not os.path.exists(analysis_file):
+        raise FileNotFoundError(
+            f"Analysis GRIB file not found: {analysis_file}\n"
+            "Run retrieve_and_store_data first."
+        )
+
+    print(f"Reading {analysis_file}")
+    data = mv.read(analysis_file)
+
+    # Unit conversion
+    units_str = ''
+    try:
+        vs = get_variable_settings(param)
+        units_str = vs.get('units', '')
+        grib_units = get_grib_units(data)
+        if grib_units:
+            from .variables import convert_to_display
+            data = convert_to_display(data, param, grib_units)
+    except Exception as e:
+        print(f"Warning: unit conversion skipped — {e}")
+
+    contour = _build_contour(param, level)
+    geoview = _build_geoview(area_sub, plot_radius)
+    legend = _build_legend(param, units_str)
+    legend_objects = [] if legend is None else [legend]
+
+    level_str = f" at {level} hPa" if level else ""
+    mars_kw = _format_settings_keywords(analysis_settings)
+    title = mv.mtext(
+        text_line_count=2,
+        text_line_1=f"Analysis — {param}{level_str} ({units_str})",
+        text_line_2=f"Valid: {valid_date.strftime('%Y-%m-%d %H:%M')}  |  {mars_kw}",
+        text_font_size=0.6,
+    )
+
+    # Observation overlay
+    obs_objects = []
+    if overlay_obs:
+        obs_data, obs_file = _load_obs_geopoints(base_path, dir_name, param, date_str, time_str)
+        if obs_data is not None:
+            base = get_base_var(param)
+            if base in ('2t', '2d', 't'):
+                from .variables import convert_to_display
+                obs_data = convert_to_display(obs_data, param, grib_units='K')
+            obs_marker = _build_obs_marker(param)
+            if obs_marker is not None:
+                obs_objects = [obs_data, obs_marker]
+                print(f"Overlaying observations from {obs_file}")
+        else:
+            print("Observation file not found — skipping overlay")
+
+    if export_png:
+        from .core import _safe_label
+        plot_dir = os.path.join(base_path, dir_name, "plot_files")
+        os.makedirs(plot_dir, exist_ok=True)
+        mars_parts = [
+            str(analysis_settings.get('class', '')),
+            str(analysis_settings.get('stream', '')),
+            str(analysis_settings.get('type', '')),
+        ]
+        mars_tag = '_'.join(p for p in mars_parts if p)
+        name_parts = ["map_Analysis", param, mars_tag, levtype]
+        if level is not None:
+            name_parts.append(f"L{level}hPa")
+        name_parts.append(f"{date_str}_{time_str}")
+        png_name = os.path.join(plot_dir, '_'.join(str(p) for p in name_parts))
+        mv.setoutput(mv.png_output(output_name=png_name, output_font_scale=1.6, output_width=2200))
+        mv.plot(data, contour, geoview, *legend_objects, title, *obs_objects)
+        print(f"Analysis map exported to: {png_name}.png")
+    else:
+        mv.plot(data, contour, geoview, *legend_objects, title, *obs_objects)
+
+
+# ---------------------------------------------------------------------------
+# Public API — model field map
 # ---------------------------------------------------------------------------
 
 def plot_field_map(plot_data, widgets_dict, model_name, step,
                    member=None, plot_radius=0, export_png=True,
-                   overlay_obs=False):
+                   overlay_obs=False, plot_mode='field'):
     """Plot a GRIB field on a map using Metview.
 
     Parameters
@@ -339,7 +725,11 @@ def plot_field_map(plot_data, widgets_dict, model_name, step,
     export_png : bool
         If True, save a PNG to the plot directory.
     overlay_obs : bool
-        If True, overlay STVL observations on the map.
+        If True, overlay STVL observations on the map (when available).
+    plot_mode : str
+        ``'field'`` (default) — plot the full gridded field with contour shading.
+        ``'station_nearest'`` — extract model values at the nearest grid points
+        to observation stations and plot as coloured markers (requires obs data).
 
     Returns
     -------
@@ -357,33 +747,40 @@ def plot_field_map(plot_data, widgets_dict, model_name, step,
     fc_date = valid_date - timedelta(hours=step)
 
     # Locate the grib file
-    from .core import setup_data_directories, get_area_string, _find_existing_directory_for_point
-    base_path = plot_data.get('base_path', '')
-    area_str = get_area_string(area_sub)
+    from .core import (_model_grib_filename,
+                       _safe_label, _get_var_settings_safe)
+
     date_str = valid_date.strftime("%Y%m%d")
+    time_str = f"{valid_date.hour:02d}00"
 
-    # Try to find existing directory (same logic as retrieve_and_store_data)
-    point = config.get('point')
-    if point is not None:
-        reuse_area_str, reuse_area = _find_existing_directory_for_point(
-            base_path, param, date_str, point,
-        )
-        if reuse_area_str is not None:
-            area_str = reuse_area_str
-            area_sub = reuse_area
-
-    # Build grib_dir path
-    grib_dir = os.path.join(base_path, f"{param}_{area_str}_{date_str}", "grib_files")
-    plot_dir = os.path.join(base_path, f"{param}_{area_str}_{date_str}", "plot_files")
+    dir_name, base_path, area_sub = _resolve_data_dir(plot_data, widgets_dict)
+    grib_dir = os.path.join(base_path, dir_name, "grib_files")
+    plot_dir = os.path.join(base_path, dir_name, "plot_files")
     os.makedirs(plot_dir, exist_ok=True)
 
-    model_file = os.path.join(
-        grib_dir,
-        f"{model_name}_{param}_{fc_date.strftime('%Y%m%d')}_{fc_date.hour:02d}00_step{step}.grib"
-    )
+    # Get variable settings
+    try:
+        var_settings = get_variable_settings(param)
+        is_accumulated = var_settings.get('is_accumulated', False)
+    except (ValueError, KeyError):
+        var_settings = _get_var_settings_safe(param)
+        is_accumulated = False
+
+    acc_period = None
+    if is_accumulated:
+        acc_widget = widgets_dict.get('acc_period_widget')
+        acc_period = acc_widget.value if acc_widget is not None else 24
+
+    # Build model filename — try new naming, fall back to old
+    new_name = _model_grib_filename(model_name, param, levtype, level, fc_date,
+                                     step, acc_period=acc_period)
+    old_name = f"{model_name}_{param}_{fc_date.strftime('%Y%m%d')}_{fc_date.hour:02d}00_step{step}.grib"
+    model_file = os.path.join(grib_dir, new_name)
+    if not os.path.exists(model_file):
+        model_file = os.path.join(grib_dir, old_name)
     if not os.path.exists(model_file):
         raise FileNotFoundError(
-            f"GRIB file not found: {model_file}\n"
+            f"GRIB file not found: {os.path.join(grib_dir, new_name)}\n"
             f"Run retrieve_and_store_data first, or check that this model/step combination was retrieved."
         )
 
@@ -393,13 +790,6 @@ def plot_field_map(plot_data, widgets_dict, model_name, step,
     # --- Select the right field / member ---
     model_settings = get_model_retrieval_settings(model_name)
     is_ensemble = model_settings.get('ensemble', False)
-
-    # Get variable settings for unit conversion
-    try:
-        var_settings = get_variable_settings(param)
-        is_accumulated = var_settings.get('is_accumulated', False)
-    except (ValueError, KeyError):
-        is_accumulated = False
 
     # Handle accumulated variables (deaccumulate)
     if is_accumulated:
@@ -424,8 +814,11 @@ def plot_field_map(plot_data, widgets_dict, model_name, step,
                 else:
                     raise ValueError(f"Member {member}: expected 2 fields for deaccumulation, found {len(m_data)}")
             else:
-                # No member specified for ensemble — plot control/first available
-                if len(data) >= 2:
+                # No member specified for ensemble — default to member 1
+                m_data = data.select(shortName=get_base_var(param), number=1)
+                if len(m_data) >= 2:
+                    data = m_data[1] - m_data[0]
+                elif len(data) >= 2:
                     data = data[1] - data[0]
         else:
             if len(data) >= 2:
@@ -445,8 +838,9 @@ def plot_field_map(plot_data, widgets_dict, model_name, step,
                 else:
                     raise ValueError(f"Member {member} not found in data")
             else:
-                # No member specified — use first field
-                data = data[0]
+                # No member specified — default to member 1
+                selected = data.select(shortName=get_base_var(param), number=1)
+                data = selected if selected else data[0]
         else:
             # Deterministic — select by shortName if multiple fields
             selected = data.select(shortName=get_base_var(param))
@@ -468,25 +862,66 @@ def plot_field_map(plot_data, widgets_dict, model_name, step,
     # --- Build plot objects ---
     contour = _build_contour(param, level)
     geoview = _build_geoview(area_sub, plot_radius)
-    legend = _build_legend(units_str)
+    legend = _build_legend(param, units_str)
+    legend_objects = [] if legend is None else [legend]
     title = _build_title(param, model_name, fc_date, step, valid_date,
-                         member=member, units=units_str, level=level)
+                         member=member, units=units_str, level=level,
+                         acc_period=acc_period, is_ensemble=is_ensemble)
 
-    # --- Observation overlay ---
-    obs_objects = []
-    if overlay_obs:
-        obs_dir = os.path.join(base_path, f"{param}_{area_str}_{date_str}", "obs_files")
-        obs_file = os.path.join(obs_dir, f"STVL_{param}_{date_str}_{valid_date.hour:02d}00.grib")
-        if os.path.exists(obs_file):
-            obs_data = mv.read(obs_file)
-            obs_marker = _build_obs_marker(param)
-            if obs_marker is not None:
-                obs_objects = [obs_data, obs_marker]
-                print(f"Overlaying observations from {obs_file}")
-            else:
-                print(f"No observation marker style defined for {param} — skipping overlay")
+    # --- Station-nearest mode: replace gridded field with geopoints ---
+    if plot_mode == 'station_nearest':
+        obs_gpt, obs_file = _load_obs_geopoints(base_path, dir_name, param, date_str, time_str)
+        if obs_gpt is None:
+            print(f"No observation file found — cannot use station_nearest mode. "
+                  f"Falling back to full field.")
+            plot_mode = 'field'
         else:
-            print(f"Observation file not found: {obs_file} — skipping overlay")
+            model_gpt = mv.nearest_gridpoint(data, obs_gpt)
+            model_marker = _build_model_marker(param, legend="on")
+            if model_marker is None:
+                model_marker = mv.msymb(
+                    symbol_type="marker", symbol_table_mode="off",
+                    legend="on",
+                    symbol_marker_index=18,
+                    symbol_colour="navy",
+                    symbol_height=0.5,
+                    symbol_outline="on",
+                    symbol_outline_colour="charcoal",
+                    symbol_outline_thickness=2,
+                )
+            n_pts = len(obs_gpt)
+            print(f"Station-nearest mode: model values extracted at {n_pts} station locations")
+            # In station_nearest mode, also overlay obs if requested
+            obs_objects = []
+            if overlay_obs:
+                base = get_base_var(param)
+                obs_display = obs_gpt
+                if base in ('2t', '2d', 't'):
+                    from .variables import convert_to_display
+                    obs_display = convert_to_display(obs_gpt, param, grib_units='K')
+                obs_marker_style = _build_obs_marker(param)
+                if obs_marker_style is not None:
+                    obs_objects = [obs_display, obs_marker_style]
+
+    # --- Observation overlay (field mode only) ---
+    if plot_mode == 'field':
+        obs_objects = []
+        if overlay_obs:
+            obs_data, obs_file = _load_obs_geopoints(base_path, dir_name, param, date_str, time_str)
+            if obs_data is not None:
+                base = get_base_var(param)
+                if base in ('2t', '2d', 't'):
+                    from .variables import convert_to_display
+                    obs_data = convert_to_display(obs_data, param, grib_units='K')
+                obs_marker = _build_obs_marker(param)
+                if obs_marker is not None:
+                    obs_objects = [obs_data, obs_marker]
+                    print(f"Overlaying observations from {obs_file}")
+                else:
+                    print(f"No observation marker style defined for {param} — skipping overlay")
+            else:
+                print(f"Observation file not found — skipping overlay "
+                      f"(not all parameters are available in STVL)")
 
     # --- Render ---
     if export_png:
@@ -495,13 +930,31 @@ def plot_field_map(plot_data, widgets_dict, model_name, step,
             member_tag = f"_mem{member}"
         elif member == 'mean':
             member_tag = "_mean"
-        safe_model = model_name.replace(' ', '_')
-        png_name = os.path.join(
-            plot_dir,
-            f"map_{safe_model}_{param}_{fc_date.strftime('%Y%m%d_%H%M')}_step{step}{member_tag}"
-        )
-        mv.setoutput(mv.png_output(output_name=png_name))
-        mv.plot(data, contour, geoview, legend, title, *obs_objects)
-        print(f"Map exported to: {png_name}.png")
+        safe_model = _safe_label(model_name)
+        from .core import _mars_file_tag
+        mars_tag = _mars_file_tag(model_name)
+        mode_tag = "_stn" if plot_mode == 'station_nearest' else ""
+        name_parts = [f"map_{safe_model}", param, mars_tag, levtype]
+        if level is not None:
+            name_parts.append(f"L{level}hPa")
+        if acc_period is not None:
+            name_parts.append(f"acc{acc_period}h")
+        name_parts.extend([
+            fc_date.strftime('%Y%m%d_%H%M'),
+            f"step{step}{member_tag}{mode_tag}",
+        ])
+        png_name = os.path.join(plot_dir, '_'.join(str(p) for p in name_parts))
+        mv.setoutput(mv.png_output(output_name=png_name, output_font_scale=2.5, output_width=2200))
+
+    if plot_mode == 'station_nearest':
+        if export_png:
+            mv.plot(model_gpt, model_marker, geoview, *legend_objects, title, *obs_objects)
+            print(f"Map exported to: {png_name}.png")
+        else:
+            mv.plot(model_gpt, model_marker, geoview, *legend_objects, title, *obs_objects)
     else:
-        mv.plot(data, contour, geoview, legend, title, *obs_objects)
+        if export_png:
+            mv.plot(data, contour, geoview, *legend_objects, title, *obs_objects)
+            print(f"Map exported to: {png_name}.png")
+        else:
+            mv.plot(data, contour, geoview, *legend_objects, title, *obs_objects)

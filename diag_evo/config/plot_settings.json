@@ -1,36 +1,36 @@
 {
     "models": {
         "IFS Control": {
-            "color": "#1f77b4",
+            "color": "#199fff",
             "marker": {
                 "symbol": "triangle-down",
                 "size": 12,
                 "line": {
-                    "color": "#0d47a1",
+                    "color": "#199fff",
                     "width": 2
                 }
             },
             "line": null
         },
         "AIFS Single": {
-            "color": "#2ca02c",
+            "color": "#ff7f0e",
             "marker": {
-                "symbol": "triangle-down",
+                "symbol": "triangle-up",
                 "size": 12,
                 "line": {
-                    "color": "#1b5e20",
+                    "color": "#20fe20",
                     "width": 2
                 }
             },
             "line": null
         },
         "AIFS ENS Control": {
-            "color": "#d62728",
+            "color": "#33a606",
             "marker": {
-                "symbol": "diamond",
-                "size": 9,
+                "symbol": "triangle-down",
+                "size": 12,
                 "line": {
-                    "color": "#b71c1c",
+                    "color": "#33a606",
                     "width": 1.5
                 }
             },
@@ -38,10 +38,10 @@
         },
         
         "IFS ENS": {
-            "color": "#1f77b4",
+            "color": "#199fff",
             "box": {
-                "fillcolor": "rgba(31, 119, 180, 0.3)",
-                "marker_color": "#1f77b4",
+                "fillcolor": "rgba(25, 159, 255, 0.3)",
+                "marker_color": "#199fff",
                 "width": 0.35
             },
             "marker": {
@@ -50,10 +50,10 @@
             }
         },
         "AIFS ENS": {
-            "color": "#2ca02c",
+            "color": "#33a606",
             "box": {
-                "fillcolor": "rgba(44, 160, 44, 0.3)",
-                "marker_color": "#2ca02c",
+                "fillcolor": "rgba(51, 166, 6, 0.3)",
+                "marker_color": "#33a606",
                 "width": 0.35
             },
             "marker": {
@@ -63,47 +63,139 @@
         },
 
         "IFS ENS Mean": {
-            "color": "#1f77b4",
+            "color": "#199fff",
             "marker": {
                 "symbol": "star",
-                "size": 12,
-                "color": "rgba(31, 119, 180, 0.7)",
+                "size": 10,
+                "color": "rgba(25, 159, 255, 0.7)",
                 "line": {
-                    "color": "#0d47a1",
+                    "color": "#199fff",
                     "width": 2
                 }
             },
             "line": {
-                "color": "#1f77b4",
+                "color": "#199fff",
                 "width": 1.5
             }
         },
         "AIFS ENS Mean": {
-            "color": "#2ca02c",
+            "color": "#33a606",
             "marker": {
                 "symbol": "star",
-                "size": 12,
-                "color": "rgba(44, 160, 44, 0.7)",
+                "size": 10,
+                "color": "rgba(51, 166, 6, 0.7)",
                 "line": {
-                    "color": "#1b5e20",
+                    "color": "#33a606",
                     "width": 2
                 }
             },
             "line": {
-                "color": "#2ca02c",
+                "color": "#33a606",
                 "width": 1.5
             }
         },
         "DE-ATOS": {
             "color": "#9467bd",
             "marker": {
-                "symbol": "diamond",
+                "symbol": "square",
                 "size": 9,
                 "line": {
                     "color": "#6a1b9a",
                     "width": 2
                 }
             }
+        },
+        "IFS_50r1 Control": {
+            "color": "#d4a017",
+            "marker": {
+                "symbol": "triangle-down",
+                "size": 12,
+                "line": {
+                    "color": "#d4a017",
+                    "width": 2
+                }
+            },
+            "line": null
+        },
+        "IFS_50r1 ENS": {
+            "color": "#d4a017",
+            "box": {
+                "fillcolor": "rgba(212, 160, 23, 0.3)",
+                "marker_color": "#d4a017",
+                "width": 0.35
+            },
+            "marker": {
+                "jitter": 0.3,
+                "pointpos": 0
+            }
+        },
+        "IFS_50r1 ENS Mean": {
+            "color": "#d4a017",
+            "marker": {
+                "symbol": "star",
+                "size": 10,
+                "color": "rgba(212, 160, 23, 0.7)",
+                "line": {
+                    "color": "#d4a017",
+                    "width": 2
+                }
+            },
+            "line": {
+                "color": "#d4a017",
+                "width": 1.5
+            }
+        },
+        "AIFSv2 Single": {
+            "color": "#e6194b",
+            "marker": {
+                "symbol": "triangle-up",
+                "size": 12,
+                "line": {
+                    "color": "#e6194b",
+                    "width": 2
+                }
+            },
+            "line": null
+        },
+        "AIFSv2 ENS": {
+            "color": "#8b0000",
+            "box": {
+                "fillcolor": "rgba(139, 0, 0, 0.3)",
+                "marker_color": "#8b0000",
+                "width": 0.35
+            },
+            "marker": {
+                "jitter": 0.3,
+                "pointpos": 0
+            }
+        },
+        "AIFSv2 ENS Mean": {
+            "color": "#8b0000",
+            "marker": {
+                "symbol": "star",
+                "size": 10,
+                "color": "rgba(139, 0, 0, 0.7)",
+                "line": {
+                    "color": "#8b0000",
+                    "width": 2
+                }
+            },
+            "line": {
+                "color": "#8b0000",
+                "width": 1.5
+            }
+        },
+        "AIFSv2 ENS Control": {
+            "color": "#f58231",
+            "marker": {
+                "symbol": "triangle-down",
+                "size": 12,
+                "line": {
+                    "color": "#f58231",
+                    "width": 2
+                }
+            },
+            "line": null
         }
     },
     "reference": {
@@ -119,12 +211,12 @@
             }
         },
         "Analysis": {
-            "color": "#ff7f0e",
+            "color": "#7f7f7f",
             "marker": {
                 "symbol": "triangle-up",
                 "size": 12,
                 "line": {
-                    "color": "#e65100",
+                    "color": "#424242",
                     "width": 2
                 }
             }

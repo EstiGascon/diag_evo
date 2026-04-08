@@ -4,20 +4,26 @@ Utility functions for handling different variable types in forecast evolution an
 
 import json
 import os
-import metview as mv
 import numpy as np
-from datetime import datetime, timedelta
+
+# Module-level cache for variable settings
+_cache_variable_settings = None
 
 def load_variable_settings():
-    """Load variable settings from JSON file"""
+    """Load variable settings from JSON file, with module-level caching."""
+    global _cache_variable_settings
+    if _cache_variable_settings is not None:
+        return _cache_variable_settings
     settings_path = os.path.join(os.path.dirname(__file__), 'config', 'variable_settings.json')
     try:
         with open(settings_path, 'r') as f:
-            return json.load(f)['variable_settings']
+            data = json.load(f)['variable_settings']
     except FileNotFoundError:
         raise FileNotFoundError(f"variable_settings.json file not found at {settings_path}")
     except json.JSONDecodeError:
         raise ValueError("Invalid JSON format in variable_settings.json")
+    _cache_variable_settings = data
+    return data
 
 def _split_var_level(var):
     """Split a variable string into (shortName, level_int_or_None).
@@ -164,85 +170,72 @@ def apply_conversion(value, conversion_type):
     else:
         raise ValueError(f"Unknown conversion type: {conversion_type}")
 
-def convert_to_display(value, var, grib_units=None):
-    """Convert value to display units based on variable settings and actual GRIB units"""
+def _convert(value, var, direction, grib_units=None):
+    """Convert a value to or from display units.
+
+    Parameters
+    ----------
+    value :
+        Numeric value or metview fieldset.
+    var : str
+        Variable name (e.g. ``'2t'``, ``'z500'``).
+    direction : str
+        ``'to_display'`` or ``'from_display'``.
+    grib_units : str or None
+        GRIB unit string.  If *None*, extracted from *value* when possible.
+    """
     settings = get_variable_settings(var)
     target_units = settings['units']
-    
-    # If no GRIB units provided, try to get them from the value if it's a metview object
+
+    # Try to get GRIB units from metview object if not provided
     if grib_units is None and hasattr(value, 'grib_get'):
         grib_units = get_grib_units(value)
-    
-    # If still no units, use the old conversion system as fallback
+
+    # Fallback: old conversion system
     if grib_units is None:
         print(f"Warning: No GRIB units found for {var}, using fallback conversion")
-        # Check if old conversion system exists
         if 'conversion' in settings:
-            conversion = settings['conversion']['to_display']
+            conversion = settings['conversion'][direction]
             return apply_conversion(value, conversion)
+        # No old-style 'conversion' key — infer from the first entry in
+        # grib_units (the canonical GRIB source unit, e.g. 'K' for temperature).
+        if 'grib_units' in settings and settings['grib_units']:
+            grib_units = settings['grib_units'][0]
+            print(f"Assuming default GRIB unit '{grib_units}' for {var}")
         else:
             return value
-    
-    # Normalize units for comparison
+
+    # Normalise and look up conversion rule
     grib_units_upper = grib_units.upper()
-    
-    # Check if the GRIB units are in our known units list
     if grib_units_upper in [u.upper() for u in settings['grib_units']]:
-        # Find the matching conversion rule
         for unit, rules in settings['conversion_rules'].items():
             if unit.upper() == grib_units_upper:
-                conversion = rules['to_display']
-                print(f"Converting {var} from {grib_units} to {target_units} using {conversion}")
+                conversion = rules[direction]
+                src = grib_units if direction == 'to_display' else target_units
+                dst = target_units if direction == 'to_display' else grib_units
+                print(f"Converting {var} from {src} to {dst} using {conversion}")
                 return apply_conversion(value, conversion)
-    
-    # If no matching conversion rule found, check if units are already correct
-    if grib_units_upper == target_units.upper():
-        print(f"No conversion needed for {var}: already in {target_units}")
+
+    # Already in target units?
+    compare_unit = target_units if direction == 'to_display' else grib_units
+    if grib_units_upper == compare_unit.upper():
+        print(f"No conversion needed for {var}: already in {compare_unit}")
         return value
-    
-    # If we get here, we don't know how to convert
-    print(f"Warning: No conversion rule found for {var} from {grib_units} to {target_units}")
+
+    src = grib_units if direction == 'to_display' else target_units
+    dst = target_units if direction == 'to_display' else grib_units
+    print(f"Warning: No conversion rule found for {var} from {src} to {dst}")
     return value
+
+
+def convert_to_display(value, var, grib_units=None):
+    """Convert value to display units based on variable settings and actual GRIB units"""
+    return _convert(value, var, 'to_display', grib_units)
+
 
 def convert_from_display(value, var, grib_units=None):
     """Convert value from display units to model units based on variable settings and actual GRIB units"""
-    settings = get_variable_settings(var)
-    target_units = settings['units']
-    
-    # If no GRIB units provided, try to get them from the value if it's a metview object
-    if grib_units is None and hasattr(value, 'grib_get'):
-        grib_units = get_grib_units(value)
-    
-    # If still no units, use the old conversion system as fallback
-    if grib_units is None:
-        print(f"Warning: No GRIB units found for {var}, using fallback conversion")
-        # Check if old conversion system exists
-        if 'conversion' in settings:
-            conversion = settings['conversion']['from_display']
-            return apply_conversion(value, conversion)
-        else:
-            return value
-    
-    # Normalize units for comparison
-    grib_units_upper = grib_units.upper()
-    
-    # Check if the GRIB units are in our known units list
-    if grib_units_upper in [u.upper() for u in settings['grib_units']]:
-        # Find the matching conversion rule
-        for unit, rules in settings['conversion_rules'].items():
-            if unit.upper() == grib_units_upper:
-                conversion = rules['from_display']
-                print(f"Converting {var} from {target_units} to {grib_units} using {conversion}")
-                return apply_conversion(value, conversion)
-    
-    # If no matching conversion rule found, check if units are already correct
-    if grib_units_upper == target_units.upper():
-        print(f"No conversion needed for {var}: already in {grib_units}")
-        return value
-    
-    # If we get here, we don't know how to convert
-    print(f"Warning: No conversion rule found for {var} from {target_units} to {grib_units}")
-    return value
+    return _convert(value, var, 'from_display', grib_units)
 
 def get_retrieval_settings(var, date, time, area, step=None, step_start=None):
     """Get retrieval settings for a variable"""
@@ -260,7 +253,8 @@ def get_retrieval_settings(var, date, time, area, step=None, step_start=None):
     # Add level for pressure level variables
     if settings['levtype'] == 'pl':
         level = get_level(var)
-        request["levelist"] = level
+        if level is not None:
+            request["levelist"] = level
     
     # Add step information if provided
     if step is not None:
@@ -273,6 +267,7 @@ def get_retrieval_settings(var, date, time, area, step=None, step_start=None):
 
 def process_accumulated_data(data, step_start, step):
     """Process accumulated data by taking the difference between steps"""
+    import metview as mv
     if step_start == 0:
         return data
     else:
@@ -296,4 +291,25 @@ def get_variable_display_name(var):
         if level is not None:
             return f"{settings['description']} at {level}hPa ({settings['units']})"
 
-    return f"{settings['description']} ({settings['units']})" 
+    return f"{settings['description']} ({settings['units']})"
+
+
+def is_derived(param):
+    """Check if param is a derived variable requiring component retrieval."""
+    try:
+        vs = get_variable_settings(param)
+        return vs.get('is_derived', False)
+    except (ValueError, KeyError):
+        return False
+
+
+def get_derivation_info(param):
+    """Return the derivation dict for a derived variable, or empty dict.
+
+    The dict has keys: ``method``, ``components``, ``output_paramId``.
+    """
+    try:
+        vs = get_variable_settings(param)
+        return vs.get('derivation', {})
+    except (ValueError, KeyError):
+        return {}
