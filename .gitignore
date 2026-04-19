@@ -1,5 +1,6 @@
 # Data artefacts
 data_files/
+**/run_configs/
 *.grib
 *.nc
 

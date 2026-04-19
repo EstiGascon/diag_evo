@@ -26,9 +26,8 @@ _PRECIP_COLOURS = [
     "rgb(1,0.45,0)", "red", "rgb(0.8,0,0)", "burgundy",
 ]
 
-_TEMP_LEVELS = list(range(-40, 50, 2))
+_TEMP_LEVELS = list(range(-30, 50, 2))
 _TEMP_COLOURS = [
-    "rgb(204,158,134)", "rgb(192,137,107)", "rgb(182,117,82)", "rgb(151,95,64)", "rgb(124,78,52)",
     "rgb(89,0,153)", "rgb(128,0,230)", "rgb(153,51,255)", "rgb(192,102,255)", "rgb(217,153,255)",
     "rgb(255,192,255)", "rgb(255,151,255)", "rgb(225,51,225)", "rgb(174,51,174)", "rgb(122,51,122)",
     "rgb(0,0,192)", "rgb(0,0,255)", "rgb(51,102,255)", "rgb(102,179,255)", "rgb(153,230,255)",
@@ -247,11 +246,89 @@ def _build_geoview(area, plot_radius=2):
     n, w, s, e = area
     padded = [n + plot_radius, w - plot_radius * 1.5,
               s - plot_radius, e + plot_radius * 1.5]
+    center_lon = (w + e) / 2.0
     return mv.geoview(
-        map_projection="cylindrical",
+        map_projection="polar_stereographic",
         map_area_definition="corners",
         area=padded,
+        map_vertical_longitude=center_lon,
         coastlines=_build_coastlines(),
+    )
+
+
+def _build_area_overlay(area_sub, point=None, nearest_info=None):
+    """Return plot objects for an area box or point markers overlay.
+
+    Parameters
+    ----------
+    area_sub : list
+        [N, W, S, E] bounding box.
+    point : list or None
+        [lat, lon] when a single point was selected. Rendered as a red
+        crosshair at the exact user-selected coordinates.
+    nearest_info : dict or None
+        Nearest-gridpoint / station info (with ``'latitude'`` and
+        ``'longitude'``) used as the observation / extraction location.
+        When provided and distinct from *point*, a second blue diagonal
+        cross ("X") marker is drawn at its coordinates.
+
+    Returns
+    -------
+    list
+        Metview plot objects to unpack into ``mv.plot()``.
+    """
+    objs = []
+
+    if point is None:
+        # Area mode — draw the area box
+        style = mv.mgraph(graph_line_colour="black", graph_line_thickness=4)
+        n, w, s, e = area_sub
+        lats = [s, n, n, s, s]
+        lons = [w, w, e, e, w]
+        objs.extend([mv.mvl_geopolyline(lats, lons, 0.1), style])
+        return objs
+
+    # --- Point mode ---
+    # 1) User-selected point — red "+" crosshair
+    lat_u, lon_u = point[0], point[1]
+    size = 0.15  # degrees
+    user_style = mv.mgraph(graph_line_colour="red", graph_line_thickness=5)
+    objs.extend([
+        mv.mvl_geopolyline([lat_u, lat_u], [lon_u - size, lon_u + size], 0.05),
+        user_style,
+        mv.mvl_geopolyline([lat_u - size, lat_u + size], [lon_u, lon_u], 0.05),
+        user_style,
+    ])
+
+    # 2) Nearest station / gridpoint — blue "X" diagonal marker
+    if (nearest_info is not None
+            and 'latitude' in nearest_info
+            and 'longitude' in nearest_info):
+        lat_n = float(nearest_info['latitude'])
+        lon_n = float(nearest_info['longitude'])
+        if abs(lat_n - lat_u) > 1e-4 or abs(lon_n - lon_u) > 1e-4:
+            station_style = mv.mgraph(graph_line_colour="blue", graph_line_thickness=4)
+            d = size * 0.8
+            objs.extend([
+                mv.mvl_geopolyline(
+                    [lat_n - d, lat_n + d], [lon_n - d, lon_n + d], 0.05),
+                station_style,
+                mv.mvl_geopolyline(
+                    [lat_n - d, lat_n + d], [lon_n + d, lon_n - d], 0.05),
+                station_style,
+            ])
+
+    return objs
+
+
+def _build_gridpoint_markers():
+    """Return an ``mv.mcont`` that renders grid-point location markers."""
+    return mv.mcont(
+        contour="off",
+        contour_grid_value_plot="on",
+        contour_grid_value_plot_type="marker",
+        contour_grid_value_marker_height=0.2,
+        contour_grid_value_marker_index=15,
     )
 
 
@@ -351,8 +428,8 @@ def _build_title(param, model_name, fc_date, step, valid_date, member=None,
 # ---------------------------------------------------------------------------
 
 # Obs bins must match the model contour intervals so colours align.
-_OBS_TEMP_MIN = list(range(-40, 48, 2))   # same as _TEMP_LEVELS[:-1]
-_OBS_TEMP_MAX = list(range(-38, 50, 2))   # same as _TEMP_LEVELS[1:]
+_OBS_TEMP_MIN = list(range(-30, 48, 2))   # same as _TEMP_LEVELS[:-1]
+_OBS_TEMP_MAX = list(range(-28, 50, 2))   # same as _TEMP_LEVELS[1:]
 
 _OBS_PRECIP_MIN = [0.5, 1, 2, 3, 4, 5, 6, 8, 10, 15, 20, 25, 30, 40, 50, 75, 100, 200]
 _OBS_PRECIP_MAX = [1, 2, 3, 4, 5, 6, 8, 10, 15, 20, 25, 30, 40, 50, 75, 100, 200, 300]
@@ -369,42 +446,48 @@ def _build_obs_marker(param, legend="off"):
     cat = _get_var_category(param)
     if cat == 'temperature':
         return mv.msymb(
-            symbol_type="marker", symbol_table_mode="on",
+            symbol_type="marker",
+            symbol_table_mode="advanced",
             legend=legend,
-            symbol_min_table=_OBS_TEMP_MIN,
-            symbol_max_table=_OBS_TEMP_MAX,
-            symbol_marker_table=[15],
-            symbol_colour_table=_TEMP_COLOURS,
-            symbol_height_table=[0.4] * len(_OBS_TEMP_MIN),
+            symbol_advanced_table_selection_type="list",
+            symbol_advanced_table_level_list=_TEMP_LEVELS,
+            symbol_advanced_table_height_list=[0.4]*len(_TEMP_LEVELS),
+            symbol_advanced_table_colour_method="list",
+            symbol_advanced_table_colour_list=_TEMP_COLOURS,
+            symbol_advanced_table_marker_list=15,
             symbol_outline="on",
-            symbol_outline_colour="black",
-            symbol_outline_thickness=1,
+            symbol_outline_colour="charcoal",
+            symbol_outline_thickness=2.2,
         )
     if cat == 'precipitation':
         return mv.msymb(
-            symbol_type="marker", symbol_table_mode="on",
+            symbol_type="marker",
+            symbol_table_mode="advanced",
             legend=legend,
-            symbol_min_table=_OBS_PRECIP_MIN,
-            symbol_max_table=_OBS_PRECIP_MAX,
-            symbol_marker_table=[15],
-            symbol_colour_table=_PRECIP_COLOURS,
-            symbol_height_table=_OBS_PRECIP_HEIGHTS,
+            symbol_advanced_table_selection_type="list",
+            symbol_advanced_table_level_list=_PRECIP_LEVELS,
+            symbol_advanced_table_height_list=[0.4]*len(_PRECIP_LEVELS),
+            symbol_advanced_table_colour_method="list",
+            symbol_advanced_table_colour_list=_PRECIP_COLOURS,
+            symbol_advanced_table_marker_list=15,
             symbol_outline="on",
-            symbol_outline_colour="black",
-            symbol_outline_thickness=1,
+            symbol_outline_colour="charcoal",
+            symbol_outline_thickness=3.2,
         )
     if cat == 'wind':
         return mv.msymb(
-            symbol_type="marker", symbol_table_mode="on",
+            symbol_type="marker",
+            symbol_table_mode="advanced",
             legend=legend,
-            symbol_min_table=_OBS_WIND_MIN,
-            symbol_max_table=_OBS_WIND_MAX,
-            symbol_marker_table=[15],
-            symbol_colour_table=_WIND_COLOURS,
-            symbol_height_table=[0.4] * len(_OBS_WIND_MIN),
+            symbol_advanced_table_selection_type="list",
+            symbol_advanced_table_level_list=_WIND_LEVELS,
+            symbol_advanced_table_height_list=[0.4]*len(_WIND_LEVELS),
+            symbol_advanced_table_colour_method="list",
+            symbol_advanced_table_colour_list=_WIND_COLOURS,
+            symbol_advanced_table_marker_list=15,
             symbol_outline="on",
-            symbol_outline_colour="black",
-            symbol_outline_thickness=1,
+            symbol_outline_colour="charcoal",
+            symbol_outline_thickness=3.2,
         )
     return None
 
@@ -414,42 +497,48 @@ def _build_model_marker(param, legend="off"):
     cat = _get_var_category(param)
     if cat == 'temperature':
         return mv.msymb(
-            symbol_type="marker", symbol_table_mode="on",
+            symbol_type="marker",
+            symbol_table_mode="advanced",
             legend=legend,
-            symbol_min_table=_OBS_TEMP_MIN,
-            symbol_max_table=_OBS_TEMP_MAX,
-            symbol_marker_table=[18],
-            symbol_colour_table=_TEMP_COLOURS,
-            symbol_height_table=[0.5] * len(_OBS_TEMP_MIN),
+            symbol_advanced_table_selection_type="list",
+            symbol_advanced_table_level_list=_TEMP_LEVELS,
+            symbol_advanced_table_colour_method="list",
+            symbol_advanced_table_colour_list=_TEMP_COLOURS,
+            symbol_advanced_table_marker_list=18,
+            symbol_advanced_table_height_list=[0.55]*len(_TEMP_LEVELS),
             symbol_outline="on",
             symbol_outline_colour="charcoal",
-            symbol_outline_thickness=2,
+            symbol_outline_thickness=3.2,
         )
     if cat == 'precipitation':
         return mv.msymb(
-            symbol_type="marker", symbol_table_mode="on",
+            symbol_type="marker",
+            symbol_table_mode="advanced",
             legend=legend,
-            symbol_min_table=_OBS_PRECIP_MIN,
-            symbol_max_table=_OBS_PRECIP_MAX,
-            symbol_marker_table=[18],
-            symbol_colour_table=_PRECIP_COLOURS,
-            symbol_height_table=_OBS_PRECIP_HEIGHTS,
+            symbol_advanced_table_selection_type="list",
+            symbol_advanced_table_level_list=_PRECIP_LEVELS,
+            symbol_advanced_table_colour_method="list",
+            symbol_advanced_table_colour_list=_PRECIP_COLOURS,
+            symbol_advanced_table_marker_list=18,
+            symbol_advanced_table_height_list=[0.55]*len(_PRECIP_LEVELS),
             symbol_outline="on",
             symbol_outline_colour="charcoal",
-            symbol_outline_thickness=2,
+            symbol_outline_thickness=3.2,
         )
     if cat == 'wind':
         return mv.msymb(
-            symbol_type="marker", symbol_table_mode="on",
+            symbol_type="marker",
+            symbol_table_mode="advanced",
             legend=legend,
-            symbol_min_table=_OBS_WIND_MIN,
-            symbol_max_table=_OBS_WIND_MAX,
-            symbol_marker_table=[18],
-            symbol_colour_table=_WIND_COLOURS,
-            symbol_height_table=[0.5] * len(_OBS_WIND_MIN),
+            symbol_advanced_table_selection_type="list",
+            symbol_advanced_table_level_list=_WIND_LEVELS,
+            symbol_advanced_table_colour_method="list",
+            symbol_advanced_table_colour_list=_WIND_COLOURS,
+            symbol_advanced_table_marker_list=18,
+            symbol_advanced_table_height_list=[0.55]*len(_WIND_LEVELS),
             symbol_outline="on",
             symbol_outline_colour="charcoal",
-            symbol_outline_thickness=2,
+            symbol_outline_thickness=3.2,
         )
     return None
 
@@ -464,7 +553,7 @@ def _resolve_data_dir(plot_data, widgets_dict):
     Returns (dir_name, base_path, area_sub) — *area_sub* may be updated if
     a point was matched against an existing directory.
     """
-    from .core import (get_area_string, _find_existing_directory_for_point)
+    from .core import get_area_string
 
     config = widgets_dict['config']
     param = config['param']
@@ -474,15 +563,6 @@ def _resolve_data_dir(plot_data, widgets_dict):
     date_str = valid_date.strftime("%Y%m%d")
     time_str = f"{valid_date.hour:02d}00"
     area_str = get_area_string(area_sub)
-
-    point = config.get('point')
-    if point is not None:
-        reuse_area_str, reuse_area = _find_existing_directory_for_point(
-            base_path, param, date_str, point, time_str,
-        )
-        if reuse_area_str is not None:
-            area_str = reuse_area_str
-            area_sub = reuse_area
 
     dir_name_new = f"{param}_{area_str}_{date_str}_{time_str}"
     dir_name_old = f"{param}_{area_str}_{date_str}"
@@ -509,7 +589,8 @@ def _load_obs_geopoints(base_path, dir_name, param, date_str, time_str):
 # Public API — observation-only map
 # ---------------------------------------------------------------------------
 
-def plot_obs_map(plot_data, widgets_dict, plot_radius=0, export_png=True):
+def plot_obs_map(plot_data, widgets_dict, plot_radius=0, export_png=True,
+                 add_markers=True):
     """Plot observation geopoints on a map (no model field).
 
     Parameters
@@ -566,6 +647,10 @@ def plot_obs_map(plot_data, widgets_dict, plot_radius=0, export_png=True):
     geoview = _build_geoview(area_sub, plot_radius)
     legend = _build_legend(param, units_str)
     legend_objects = [] if legend is None else [legend]
+    nginfo = plot_data.get('nearest_gridinfo_dict', {})
+    area_overlay = _build_area_overlay(
+        area_sub, point=config.get('point'),
+        nearest_info=nginfo.get('nearest_station')) if add_markers else []
 
     title = mv.mtext(
         text_line_count=2,
@@ -579,11 +664,11 @@ def plot_obs_map(plot_data, widgets_dict, plot_radius=0, export_png=True):
         plot_dir = os.path.join(base_path, dir_name, "plot_files")
         os.makedirs(plot_dir, exist_ok=True)
         png_name = os.path.join(plot_dir, f"map_obs_{param}_{date_str}_{time_str}")
-        mv.setoutput(mv.png_output(output_name=png_name, output_font_scale=1.6, output_width=2200))
-        mv.plot(obs_data, obs_marker, geoview, *legend_objects, title)
+        mv.setoutput(mv.png_output(output_name=png_name, output_name_first_page_number='off', output_font_scale=1.6, output_width=2200))
+        mv.plot(obs_data, obs_marker, geoview, *legend_objects, title, *area_overlay)
         print(f"Obs map exported to: {png_name}.png")
     else:
-        mv.plot(obs_data, obs_marker, geoview, *legend_objects, title)
+        mv.plot(obs_data, obs_marker, geoview, *legend_objects, title, *area_overlay)
 
 
 # ---------------------------------------------------------------------------
@@ -591,7 +676,8 @@ def plot_obs_map(plot_data, widgets_dict, plot_radius=0, export_png=True):
 # ---------------------------------------------------------------------------
 
 def plot_analysis_map(plot_data, widgets_dict, plot_radius=0, export_png=True,
-                      overlay_obs=False):
+                      overlay_obs=False, show_gridpoints=False,
+                      add_markers=True):
     """Plot the analysis field on a map.
 
     Parameters
@@ -606,6 +692,8 @@ def plot_analysis_map(plot_data, widgets_dict, plot_radius=0, export_png=True,
         If True, save a PNG to the plot directory.
     overlay_obs : bool
         If True, overlay STVL observations on the map (when available).
+    show_gridpoints : bool
+        If True, overlay grid-point markers on the field.
     """
     from .core import _reference_grib_filename, _get_var_settings_safe
 
@@ -650,6 +738,11 @@ def plot_analysis_map(plot_data, widgets_dict, plot_radius=0, export_png=True,
     geoview = _build_geoview(area_sub, plot_radius)
     legend = _build_legend(param, units_str)
     legend_objects = [] if legend is None else [legend]
+    gp_objects = [data, _build_gridpoint_markers()] if show_gridpoints else []
+    nginfo = plot_data.get('nearest_gridinfo_dict', {})
+    area_overlay = _build_area_overlay(
+        area_sub, point=config.get('point'),
+        nearest_info=nginfo.get('nearest_analysis')) if add_markers else []
 
     level_str = f" at {level} hPa" if level else ""
     mars_kw = _format_settings_keywords(analysis_settings)
@@ -691,11 +784,11 @@ def plot_analysis_map(plot_data, widgets_dict, plot_radius=0, export_png=True,
             name_parts.append(f"L{level}hPa")
         name_parts.append(f"{date_str}_{time_str}")
         png_name = os.path.join(plot_dir, '_'.join(str(p) for p in name_parts))
-        mv.setoutput(mv.png_output(output_name=png_name, output_font_scale=1.6, output_width=2200))
-        mv.plot(data, contour, geoview, *legend_objects, title, *obs_objects)
+        mv.setoutput(mv.png_output(output_name=png_name, output_name_first_page_number='off', output_font_scale=1.6, output_width=2200))
+        mv.plot(data, contour, geoview, *legend_objects, title, *obs_objects, *area_overlay, *gp_objects)
         print(f"Analysis map exported to: {png_name}.png")
     else:
-        mv.plot(data, contour, geoview, *legend_objects, title, *obs_objects)
+        mv.plot(data, contour, geoview, *legend_objects, title, *obs_objects, *area_overlay, *gp_objects)
 
 
 # ---------------------------------------------------------------------------
@@ -704,7 +797,8 @@ def plot_analysis_map(plot_data, widgets_dict, plot_radius=0, export_png=True,
 
 def plot_field_map(plot_data, widgets_dict, model_name, step,
                    member=None, plot_radius=0, export_png=True,
-                   overlay_obs=False, plot_mode='field'):
+                   overlay_obs=False, plot_mode='field',
+                   show_gridpoints=False, add_markers=True):
     """Plot a GRIB field on a map using Metview.
 
     Parameters
@@ -730,6 +824,8 @@ def plot_field_map(plot_data, widgets_dict, model_name, step,
         ``'field'`` (default) — plot the full gridded field with contour shading.
         ``'station_nearest'`` — extract model values at the nearest grid points
         to observation stations and plot as coloured markers (requires obs data).
+    show_gridpoints : bool
+        If True, overlay grid-point markers on the field.
 
     Returns
     -------
@@ -864,6 +960,11 @@ def plot_field_map(plot_data, widgets_dict, model_name, step,
     geoview = _build_geoview(area_sub, plot_radius)
     legend = _build_legend(param, units_str)
     legend_objects = [] if legend is None else [legend]
+    gp_objects = [data, _build_gridpoint_markers()] if show_gridpoints else []
+    nginfo = plot_data.get('nearest_gridinfo_dict', {})
+    area_overlay = _build_area_overlay(
+        area_sub, point=config.get('point'),
+        nearest_info=nginfo.get(model_name + '_nearest')) if add_markers else []
     title = _build_title(param, model_name, fc_date, step, valid_date,
                          member=member, units=units_str, level=level,
                          acc_period=acc_period, is_ensemble=is_ensemble)
@@ -944,17 +1045,17 @@ def plot_field_map(plot_data, widgets_dict, model_name, step,
             f"step{step}{member_tag}{mode_tag}",
         ])
         png_name = os.path.join(plot_dir, '_'.join(str(p) for p in name_parts))
-        mv.setoutput(mv.png_output(output_name=png_name, output_font_scale=2.5, output_width=2200))
+        mv.setoutput(mv.png_output(output_name=png_name, output_name_first_page_number='off',output_font_scale=2.5, output_width=2200))
 
     if plot_mode == 'station_nearest':
         if export_png:
-            mv.plot(model_gpt, model_marker, geoview, *legend_objects, title, *obs_objects)
+            mv.plot(model_gpt, model_marker, geoview, *legend_objects, title, *obs_objects, *area_overlay)
             print(f"Map exported to: {png_name}.png")
         else:
-            mv.plot(model_gpt, model_marker, geoview, *legend_objects, title, *obs_objects)
+            mv.plot(model_gpt, model_marker, geoview, *legend_objects, title, *obs_objects, *area_overlay)
     else:
         if export_png:
-            mv.plot(data, contour, geoview, *legend_objects, title, *obs_objects)
+            mv.plot(data, contour, geoview, *legend_objects, title, *obs_objects, *area_overlay, *gp_objects)
             print(f"Map exported to: {png_name}.png")
         else:
-            mv.plot(data, contour, geoview, *legend_objects, title, *obs_objects)
+            mv.plot(data, contour, geoview, *legend_objects, title, *obs_objects, *area_overlay, *gp_objects)

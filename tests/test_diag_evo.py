@@ -78,11 +78,11 @@ from diag_evo.core import (
     _model_grib_filename,
     _reference_grib_filename,
     _parse_area_from_dirname,
+    _expand_area_for_plotting,
     get_area_string,
     sanitize_mars_request,
     _should_keep_grid,
     setup_data_directories,
-    _find_existing_directory_for_point,
 )
 
 
@@ -404,25 +404,11 @@ class TestSetupDataDirectories:
             assert "0000" in grib
 
 
-class TestFindExistingDirectory:
-    def test_finds_match(self):
-        with tempfile.TemporaryDirectory() as tmpdir:
-            # Create a matching directory
-            dirname = "2t_N50.0_W8.0_S48.0_E13.0_20250327_1200"
-            grib_dir = os.path.join(tmpdir, dirname, "grib_files")
-            os.makedirs(grib_dir)
-            # Create a dummy file so directory is non-empty
-            open(os.path.join(grib_dir, "dummy.grib"), "w").close()
+class TestExpandAreaForPlotting:
+    def test_expands_all_sides(self):
+        expanded = _expand_area_for_plotting([50.0, 8.0, 48.0, 13.0], radius=4.0)
+        assert expanded == [54.0, 4.0, 44.0, 17.0]
 
-            area_str, area = _find_existing_directory_for_point(
-                tmpdir, "2t", "20250327", [49.0, 10.0], "1200"
-            )
-            assert area_str is not None
-            assert area is not None
-
-    def test_no_match(self):
-        with tempfile.TemporaryDirectory() as tmpdir:
-            area_str, area = _find_existing_directory_for_point(
-                tmpdir, "2t", "20250327", [49.0, 10.0], "1200"
-            )
-            assert area_str is None
+    def test_clamps_to_valid_bounds(self):
+        expanded = _expand_area_for_plotting([89.0, -179.0, -89.0, 179.0], radius=4.0)
+        assert expanded == [90.0, -180.0, -90.0, 180.0]

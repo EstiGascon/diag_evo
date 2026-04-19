@@ -8,6 +8,7 @@ import numpy as np
 import pandas as pd
 import plotly.graph_objs as go
 import matplotlib.pyplot as plt
+import seaborn as sns
 import cartopy.crs as ccrs
 import cartopy.feature as cfeature
 from IPython.display import display
@@ -20,6 +21,61 @@ from .settings import (
     _hex_to_rgb,
 )
 from .core import _model_display_label, _build_ylabel
+
+
+# ---------------------------------------------------------------------------
+# Percentile helpers (ECMWF / Metview convention)
+# ---------------------------------------------------------------------------
+
+# Standard percentile levels used in the static plot, ordered as the
+# downstream code expects (highest -> lowest).
+PCTL_LEVELS = [99, 90, 75, 50, 25, 10, 1]
+
+
+def _ecmwf_percentiles(values, levels=PCTL_LEVELS, method='nearest_neighbour'):
+    """Compute percentiles using the ECMWF / Metview convention.
+
+    Rank formula::
+
+        R = P / 100 * (N + 1)
+
+    with one of two interpolation methods:
+
+    * ``'nearest_neighbour'`` (default, matches Metview): round R to the
+      nearest integer rank, ``P_th = V[int(R + 0.5)]``.
+    * ``'linear'``: linear interpolation between adjacent ranks,
+      ``P_th = FR * (V[IR+1] - V[IR]) + V[IR]``.
+
+    Note this differs from NumPy's default percentile (Hyndman & Fan
+    method 7), which uses ``R = P/100 * (N - 1)`` and linear
+    interpolation. The ECMWF linear option is equivalent to NumPy's
+    ``method='weibull'``.
+    """
+    arr = np.array([float(v) for v in values
+                    if v is not None
+                    and not (isinstance(v, float) and np.isnan(v))])
+    n = len(arr)
+    if n < 2:
+        return [np.nan] * len(levels)
+    arr.sort()  # ascending; ranks are 1-based
+
+    out = []
+    for p in levels:
+        r = (p / 100.0) * (n + 1)
+        if method == 'nearest_neighbour':
+            idx = int(r + 0.5) - 1            # round, convert to 0-based
+            idx = max(0, min(n - 1, idx))
+            out.append(float(arr[idx]))
+        elif method == 'linear':
+            ir = int(np.floor(r))
+            fr = r - ir
+            i_lo = max(0, min(n - 1, ir - 1))      # V[IR] (0-based)
+            i_hi = max(0, min(n - 1, ir))          # V[IR+1] (0-based)
+            out.append(float(arr[i_lo] + fr * (arr[i_hi] - arr[i_lo])))
+        else:
+            raise ValueError(
+                f"Unknown pctl_method {method!r}. Use 'nearest_neighbour' or 'linear'.")
+    return out
 
 
 # ---------------------------------------------------------------------------
@@ -114,8 +170,9 @@ def plot_forecast_evolution(plot_data, widgets_dict, plot_dir,
     data_df = plot_data['data_df'].iloc[::-1].reset_index(drop=True).copy()
 
     # Determine ensemble models for dynamic x-offset spacing
+    _selected = config.get('selected_models') or list(widgets_dict['model_widgets'].value)
     _ensemble_models = [
-        m for m in widgets_dict['model_widgets'].value
+        m for m in _selected
         if get_model_retrieval_settings(m)['ensemble']
     ]
     _n_ens = len(_ensemble_models)
@@ -128,7 +185,7 @@ def plot_forecast_evolution(plot_data, widgets_dict, plot_dir,
             _ens_offsets[m] = -total_span / 2 + idx * total_span / (_n_ens - 1)
 
     # Add traces for each model
-    for model_name in widgets_dict['model_widgets'].value:
+    for model_name in _selected:
         model_settings = get_model_retrieval_settings(model_name)
         plot_settings = _apply_color_override(
             get_model_plot_settings(model_name), model_name, color_overrides)
@@ -173,7 +230,7 @@ def plot_forecast_evolution(plot_data, widgets_dict, plot_dir,
                                 f"Model: {_dlabel}<br>Date: %{{customdata[2]}}<br>"
                                 f"Lead Time: %{{customdata[0]}}h<br>Member: %{{customdata[1]}}<br>"
                                 f"Value: %{{y:.2f}}{plot_data['var_settings']['units']}"
-                                + (f"<br>Bias: %{{customdata[3]:.2f}}{plot_data['var_settings']['units']}"
+                                + (f"<br>Fcst-REF: %{{customdata[3]:.2f}}{plot_data['var_settings']['units']}"
                                    if plot_data['reference'] is not None else "")
                                 + "<br><extra></extra>"
                             ),
@@ -185,7 +242,10 @@ def plot_forecast_evolution(plot_data, widgets_dict, plot_dir,
                     )
 
                 # Ensemble means
-                mean_data = data_df[data_df[f'{model_name}_mean_area'].notna()].copy()
+                mean_col = f'{model_name}_mean_area'
+                if mean_col not in data_df.columns:
+                    continue
+                mean_data = data_df[data_df[mean_col].notna()].copy()
                 if not mean_data.empty:
                     mean_model_name = f"{model_name} Mean"
                     try:
@@ -229,7 +289,7 @@ def plot_forecast_evolution(plot_data, widgets_dict, plot_dir,
                                 f"Initialisation Date: %{{customdata[1]}}<br>"
                                 f"Lead Time: %{{customdata[0]}}h<br>"
                                 f"Value: %{{y:.2f}}{plot_data['var_settings']['units']}"
-                                + (f"<br>Bias: %{{customdata[2]:.2f}}{plot_data['var_settings']['units']}"
+                                + (f"<br>Fcst-REF: %{{customdata[2]:.2f}}{plot_data['var_settings']['units']}"
                                    if plot_data['reference'] is not None else "")
                                 + f"<extra>Model: {_dlabel} Mean</extra>"
                             ),
@@ -271,7 +331,7 @@ def plot_forecast_evolution(plot_data, widgets_dict, plot_dir,
                         f"Initialisation Date: %{{customdata[1]}}<br>"
                         f"Lead Time: %{{customdata[0]}}h<br>"
                         f"Value: %{{y:.2f}}{plot_data['var_settings']['units']}"
-                        + (f"<br>Bias: %{{customdata[2]:.2f}}{plot_data['var_settings']['units']}"
+                        + (f"<br>Fcst-REF: %{{customdata[2]:.2f}}{plot_data['var_settings']['units']}"
                            if plot_data['reference'] is not None else "")
                         + f"<extra>Model: {_dlabel}</extra>"
                     ),
@@ -323,8 +383,19 @@ def plot_forecast_evolution(plot_data, widgets_dict, plot_dir,
 
 def plot_forecast_evolution_static(plot_data, widgets_dict, plot_dir,
                                     figsize=(22, 9), export_png=False,
-                                    png_filename=None):
-    """Create a static matplotlib forecast evolution plot."""
+                                    png_filename=None,
+                                    pctl_method='nearest_neighbour'):
+    """Create a static matplotlib forecast evolution plot.
+
+    Parameters
+    ----------
+    pctl_method : {'nearest_neighbour', 'linear'}, default 'nearest_neighbour'
+        Interpolation method used by :func:`_ecmwf_percentiles` to compute
+        ensemble percentiles. Matches the Metview / ECMWF convention
+        (``R = P/100 * (N + 1)``). Ignored for models that already provide
+        precomputed percentiles via the ``<model>_ens_pctls`` column
+        (e.g. NB ENS).
+    """
     config = widgets_dict['config']
     valid_date = config['valid_date']
     param = config['param']
@@ -336,12 +407,13 @@ def plot_forecast_evolution_static(plot_data, widgets_dict, plot_dir,
     data_df = plot_data['data_df'].iloc[::-1].reset_index(drop=True).copy()
 
     date_labels = data_df['forecast_date'].apply(
-        lambda d: d.strftime('%m-%d %HZ') if hasattr(d, 'strftime') else str(d)
+        lambda d: (d.strftime('%b ') + str(d.day) + d.strftime(' %Hz'))
+        if hasattr(d, 'strftime') else str(d)
     ).tolist()
     xticks = np.arange(len(data_df))
 
     # Classify models
-    selected_models = list(widgets_dict['model_widgets'].value)
+    selected_models = list(config.get('selected_models') or widgets_dict['model_widgets'].value)
     ensemble_models = []
     deterministic_models = []
     for mn in selected_models:
@@ -358,24 +430,22 @@ def plot_forecast_evolution_static(plot_data, widgets_dict, plot_dir,
     elif n_ens == 1:
         slot_offsets_ens = [0.0]
     else:
-        slot_offsets_ens = np.linspace(-0.18, 0.18, n_ens).tolist()
+        slot_offsets_ens = np.linspace(-0.24, 0.24, n_ens).tolist()
 
     ens_slot = {mn: i for i, mn in enumerate(ensemble_models)}
 
     # Percentile constants
-    pctl_levels = [99, 90, 75, 50, 25, 10, 1]
+    pctl_levels = PCTL_LEVELS
     pctl_to_idx = {p: i for i, p in enumerate(pctl_levels)}
     box_width = 0.20
     thin_width = 0.10
     median_bar_width = 0.18
 
-    def _safe_percentiles(vals):
-        arr = np.array([float(v) for v in vals if v is not None
-                        and not (isinstance(v, float) and np.isnan(v))])
-        if len(arr) < 2:
-            return [np.nan] * 7
-        return list(np.percentile(arr, pctl_levels))
-
+    sns.set_theme(style='whitegrid', rc={
+        'axes.edgecolor': '.3',
+        'grid.color': '.85',
+        'axes.grid.axis': 'y',
+    })
     fig_mpl, ax = plt.subplots(figsize=figsize)
 
     # --- Ensemble percentile boxes ---
@@ -385,13 +455,22 @@ def plot_forecast_evolution_static(plot_data, widgets_dict, plot_dir,
         si = ens_slot[model_name]
         offset = slot_offsets_ens[si]
 
+        # Models such as NB ENS provide precomputed percentiles directly;
+        # use them as-is rather than recomputing from a synthetic member
+        # expansion.
+        pctl_col = f'{model_name}_ens_pctls'
+        ens_col = f'{model_name}_ens_area'
         pctl_matrix = []
         for _, row in data_df.iterrows():
-            vals = row.get(f'{model_name}_ens_area')
+            raw_pctls = row.get(pctl_col) if pctl_col in data_df.columns else None
+            if isinstance(raw_pctls, (list, np.ndarray)) and len(raw_pctls) == len(pctl_levels):
+                pctl_matrix.append([float(v) for v in raw_pctls])
+                continue
+            vals = row.get(ens_col)
             if isinstance(vals, (list, np.ndarray)) and len(vals) > 0:
-                pctl_matrix.append(_safe_percentiles(vals))
+                pctl_matrix.append(_ecmwf_percentiles(vals, pctl_levels, pctl_method))
             else:
-                pctl_matrix.append([np.nan] * 7)
+                pctl_matrix.append([np.nan] * len(pctl_levels))
         pctl_matrix = np.array(pctl_matrix)
         xpos = xticks + offset
 
@@ -457,7 +536,7 @@ def plot_forecast_evolution_static(plot_data, widgets_dict, plot_dir,
                 _dlabel = _model_display_label(model_name)
                 
                 h = ax.scatter(xticks[mask], ys[mask], facecolor=color,
-                               marker=mpl_marker, edgecolor='black', alpha=0.7,
+                               marker=mpl_marker, edgecolor='black', alpha=0.85,
                                s=160 if mpl_marker != 's' else 130, zorder=10, label=_dlabel)
                 scatter_handles.append(h)
 
@@ -503,15 +582,26 @@ def plot_forecast_evolution_static(plot_data, widgets_dict, plot_dir,
     _right_x = 0.83
     _right_w = 0.16
     fig_mpl.subplots_adjust(left=0.06, right=_right_x - 0.01, top=0.93, bottom=0.22)
-    ax.legend(legend_entries,
-              [e.get_label() for e in legend_entries],
-              loc='upper left',
-              bbox_to_anchor=(_right_x, 0.93),
-              bbox_transform=fig_mpl.transFigure,
-              fontsize=11, frameon=False)
 
-    # Inset map
-    _draw_inset_map(fig_mpl, area_sub, point, _right_x, _right_w)
+    # Legend at top-right
+    leg = ax.legend(legend_entries,
+                    [e.get_label() for e in legend_entries],
+                    loc='upper left',
+                    bbox_to_anchor=(_right_x, 0.93),
+                    bbox_transform=fig_mpl.transFigure,
+                    fontsize=11, frameon=False)
+
+    # Determine where the legend ends (in figure coords) so the inset
+    # map is placed below it without overlap.
+    fig_mpl.canvas.draw()  # force layout so legend bbox is computed
+    leg_bbox_fig = leg.get_window_extent().transformed(
+        fig_mpl.transFigure.inverted())
+    _map_h = 0.20
+    _map_top = max(leg_bbox_fig.y0 - 0.02, _map_h + 0.02)
+
+    # Inset map placed below the legend
+    _draw_inset_map(fig_mpl, area_sub, point, _right_x, _right_w,
+                    map_y=_map_top - _map_h, map_h=_map_h)
 
     # Export
     if export_png:
@@ -522,7 +612,6 @@ def plot_forecast_evolution_static(plot_data, widgets_dict, plot_dir,
         fig_mpl.savefig(png_filename, dpi=150, bbox_inches='tight')
         print(f"Static plot exported to: {png_filename}")
 
-    plt.show()
     plt.close(fig_mpl)
     return fig_mpl
 
@@ -568,20 +657,20 @@ def _add_reference_traces(fig, data_df, plot_data):
 def _build_title_text(valid_date, point, area_sub, plot_data, html=True):
     """Build the plot title string."""
     sep = "<br>" if html else "\n"
+    date_str = valid_date.strftime('%b ') + str(valid_date.day) + valid_date.strftime(' %Hz %Y')
     if point:
-        titre = (f"Forecast Evolution (Valid: {valid_date.strftime('%Y-%m-%d %H:%M')}) "
-                 f"at {point[0]:.3f}\u00b0N, {point[1]:.3f}\u00b0E")
+        titre = (f"Forecast Evolution (Valid: {date_str}) "
+                 f"at {point[0]:.2f}\u00b0N, {point[1]:.2f}\u00b0E")
         ns = plot_data.get('nearest_gridinfo_dict', {}).get('nearest_station')
         if ns is not None:
-            titre += (f"{sep}Nearest station (stnid: {ns['stnid']}, "
-                      f"elev: {ns['elevation']}, "
-                      f"lat: {ns['latitude']:.2f}, lon: {ns['longitude']:.2f}, "
-                      f"dist: {ns['distance']:.2f} km, "
-                      f"value: {ns['value_0']:.2f})")
+            titre += (f"{sep}Nearest station {ns['stnid']} "
+                      f"(elev {ns['elevation']} m, "
+                      f"{ns['latitude']:.2f}\u00b0N, {ns['longitude']:.2f}\u00b0E, "
+                      f"{ns['distance']:.1f} km, val {ns['value_0']:.2f})")
     else:
-        titre = (f"Forecast Evolution (Valid: {valid_date.strftime('%Y-%m-%d %H:%M')}) "
-                 f"for {area_sub[0]:.4f}\u00b0N to {area_sub[2]:.4f}\u00b0N, "
-                 f"{area_sub[1]:.4f}\u00b0E to {area_sub[3]:.4f}\u00b0E")
+        titre = (f"Forecast Evolution (Valid: {date_str}) "
+                 f"for [{area_sub[0]:.2f}\u00b0N, {area_sub[1]:.2f}\u00b0E] – "
+                 f"[{area_sub[2]:.2f}\u00b0N, {area_sub[3]:.2f}\u00b0E]")
     return titre
 
 
@@ -598,10 +687,11 @@ def _build_export_filename(plot_dir, point, area_sub, valid_date, param,
             f"{valid_date.strftime('%Y%m%d_%H%M')}_{param}{ext}")
 
 
-def _draw_inset_map(fig_mpl, area_sub, point, right_x, right_w):
+def _draw_inset_map(fig_mpl, area_sub, point, right_x, right_w,
+                    map_y=None, map_h=None):
     """Draw the cartopy inset map on the right side of the figure."""
-    _map_h = 0.28
-    _map_y = 0.12
+    _map_h = map_h if map_h is not None else 0.28
+    _map_y = map_y if map_y is not None else 0.12
     map_n, map_w, map_s, map_e = area_sub
     center_lat = (map_n + map_s) / 2.0
     center_lon = (map_w + map_e) / 2.0

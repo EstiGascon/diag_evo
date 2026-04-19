@@ -21,7 +21,15 @@ from .core import (
     setup_data_directories,
     get_area_string,
     sanitize_mars_request,
+    save_run_config,
+    load_run_config,
+    normalize_config,
+    build_widgets_dict,
+    fetch_observations_only,
+    STVL_AVAILABLE_PARAMS,
 )
+
+from .nb_ensemble import add_nb_ens_to_plot_data
 
 from .plotting import (
     plot_forecast_evolution,
@@ -49,6 +57,13 @@ __all__ = [
     "setup_data_directories",
     "get_area_string",
     "sanitize_mars_request",
+    "save_run_config",
+    "load_run_config",
+    "normalize_config",
+    "build_widgets_dict",
+    "add_nb_ens_to_plot_data",
+    "fetch_observations_only",
+    "STVL_AVAILABLE_PARAMS",
     # Plotting
     "plot_forecast_evolution",
     "plot_forecast_evolution_static",

@@ -4,14 +4,14 @@
                         "levtype": "sfc",
                         "description": "2m Temperature",
                         "is_accumulated": false,
-                        "units": "\u00b0C",
+                        "units": "°C",
                         "grib_units": [
                                 "K",
                                 "KELVIN",
                                 "C",
                                 "CELSIUS",
-                                "\u00b0C",
-                                "\u00b0K"
+                                "°C",
+                                "°K"
                         ],
                         "conversion_rules": {
                                 "K": {
@@ -30,11 +30,11 @@
                                         "to_display": "none",
                                         "from_display": "none"
                                 },
-                                "\u00b0C": {
+                                "°C": {
                                         "to_display": "none",
                                         "from_display": "none"
                                 },
-                                "\u00b0K": {
+                                "°K": {
                                         "to_display": "subtract_273.15",
                                         "from_display": "add_273.15"
                                 }
@@ -45,14 +45,14 @@
                         "levtype": "sfc",
                         "description": "2m Dew Point Temperature",
                         "is_accumulated": false,
-                        "units": "\u00b0C",
+                        "units": "°C",
                         "grib_units": [
                                 "K",
                                 "KELVIN",
                                 "C",
                                 "CELSIUS",
-                                "\u00b0C",
-                                "\u00b0K"
+                                "°C",
+                                "°K"
                         ],
                         "conversion_rules": {
                                 "K": {
@@ -71,11 +71,11 @@
                                         "to_display": "none",
                                         "from_display": "none"
                                 },
-                                "\u00b0C": {
+                                "°C": {
                                         "to_display": "none",
                                         "from_display": "none"
                                 },
-                                "\u00b0K": {
+                                "°K": {
                                         "to_display": "subtract_273.15",
                                         "from_display": "add_273.15"
                                 }
@@ -524,9 +524,9 @@
                                 "mm",
                                 "kg/m2",
                                 "kg/m**2",
-                                "kg m-2",
+                                "kg m**-2",
                                 "kgm-2",
-                                "kg m**-2"
+                                "kg m-2"
                         ],
                         "conversion_rules": {
                                 "m": {
@@ -564,14 +564,14 @@
                         "levtype": "pl",
                         "description": "Temperature",
                         "is_accumulated": false,
-                        "units": "\u00b0C",
+                        "units": "°C",
                         "grib_units": [
                                 "K",
                                 "KELVIN",
                                 "C",
                                 "CELSIUS",
-                                "\u00b0C",
-                                "\u00b0K"
+                                "°C",
+                                "°K"
                         ],
                         "conversion_rules": {
                                 "K": {
@@ -590,11 +590,11 @@
                                         "to_display": "none",
                                         "from_display": "none"
                                 },
-                                "\u00b0C": {
+                                "°C": {
                                         "to_display": "none",
                                         "from_display": "none"
                                 },
-                                "\u00b0K": {
+                                "°K": {
                                         "to_display": "subtract_273.15",
                                         "from_display": "add_273.15"
                                 }
@@ -4481,6 +4481,68 @@
                                 "WS50": 50
                         },
                         "paramId": 10
+                },
+                "pres": {
+                        "levtype": "sfc",
+                        "description": "Surface Pressure",
+                        "is_accumulated": false,
+                        "units": "hPa",
+                        "grib_units": [
+                                "Pa",
+                                "hPa",
+                                "mb",
+                                "mbar",
+                                "HPA"
+                        ],
+                        "conversion_rules": {
+                                "Pa": {
+                                        "to_display": "divide_100",
+                                        "from_display": "multiply_100"
+                                },
+                                "hPa": {
+                                        "to_display": "none",
+                                        "from_display": "none"
+                                },
+                                "mb": {
+                                        "to_display": "none",
+                                        "from_display": "none"
+                                },
+                                "mbar": {
+                                        "to_display": "none",
+                                        "from_display": "none"
+                                },
+                                "HPA": {
+                                        "to_display": "none",
+                                        "from_display": "none"
+                                }
+                        },
+                        "paramId": 54
+                },
+                "vis": {
+                        "levtype": "sfc",
+                        "description": "Visibility",
+                        "is_accumulated": false,
+                        "units": "m",
+                        "grib_units": [
+                                "m",
+                                "M",
+                                "km"
+                        ],
+                        "conversion_rules": {
+                                "m": {
+                                        "to_display": "none",
+                                        "from_display": "none"
+                                },
+                                "M": {
+                                        "to_display": "none",
+                                        "from_display": "none"
+                                },
+                                "km": {
+                                        "to_display": "multiply_1000",
+                                        "from_display": "divide_1000"
+                                }
+                        },
+                        "paramId": 3020
                 }
         }
 }
