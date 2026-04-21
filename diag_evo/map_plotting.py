@@ -126,8 +126,25 @@ def _get_var_category(param):
         return 'cloud_cover'
     if base == 'msl':
         return 'pressure'
-    if base in ('10u', '10v', '10si', '10fg', '100u', '100v', '100si', 'u', 'v', 'ws'):
+    if base in ('10u', '10v', '10si', '10fg', '10fg6', '100u', '100v', '100si', 'u', 'v', 'ws'):
         return 'wind'
+    # Fallback: infer from units / description in variable_settings.json
+    try:
+        vs = get_variable_settings(param)
+    except (ValueError, KeyError):
+        return 'default'
+    units = str(vs.get('units', '')).lower()
+    desc = str(vs.get('description', '')).lower()
+    if 'm/s' in units or 'wind' in desc or 'gust' in desc:
+        return 'wind'
+    if units in ('°c', 'c', 'k') or 'temperature' in desc:
+        return 'temperature'
+    if units in ('mm', 'm') and ('precip' in desc or 'rain' in desc or 'snow' in desc):
+        return 'precipitation'
+    if units in ('hpa', 'pa', 'mb') or 'pressure' in desc:
+        return 'pressure'
+    if units == '%' and ('cloud' in desc or 'cover' in desc):
+        return 'cloud_cover'
     return 'default'
 
 
@@ -590,7 +607,7 @@ def _load_obs_geopoints(base_path, dir_name, param, date_str, time_str):
 # ---------------------------------------------------------------------------
 
 def plot_obs_map(plot_data, widgets_dict, plot_radius=0, export_png=True,
-                 add_markers=True):
+                 add_markers=False):
     """Plot observation geopoints on a map (no model field).
 
     Parameters
@@ -677,7 +694,7 @@ def plot_obs_map(plot_data, widgets_dict, plot_radius=0, export_png=True,
 
 def plot_analysis_map(plot_data, widgets_dict, plot_radius=0, export_png=True,
                       overlay_obs=False, show_gridpoints=False,
-                      add_markers=True):
+                      add_markers=False):
     """Plot the analysis field on a map.
 
     Parameters
@@ -798,7 +815,7 @@ def plot_analysis_map(plot_data, widgets_dict, plot_radius=0, export_png=True,
 def plot_field_map(plot_data, widgets_dict, model_name, step,
                    member=None, plot_radius=0, export_png=True,
                    overlay_obs=False, plot_mode='field',
-                   show_gridpoints=False, add_markers=True):
+                   show_gridpoints=False, add_markers=False):
     """Plot a GRIB field on a map using Metview.
 
     Parameters

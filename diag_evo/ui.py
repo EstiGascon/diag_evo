@@ -8,7 +8,7 @@ from datetime import datetime, timedelta
 import ipywidgets as widgets
 import pandas as pd
 from IPython.display import display
-from ipyleaflet import Map, DrawControl, basemaps, CircleMarker, LayerGroup, Popup
+from ipyleaflet import Map, DrawControl, basemaps, GeoJSON, LayerGroup, Popup
 
 from .settings import (
     get_model_settings,
@@ -695,6 +695,7 @@ def on_button_clicked(b, widgets_dict):
                 if _get_var_settings_safe(param).get('is_accumulated', False)
                 else None
             ),
+            'base_path': widgets_dict.get('base_path'),
         }
         # Normalise (wraps longitudes, auto-derives area_sub/dates if needed)
         normalize_config(widgets_dict['config'])
@@ -748,7 +749,7 @@ def _cmap_for_param(param):
         return 'YlGnBu'
     if base in ('msl', 'pres'):
         return 'viridis'
-    if base in ('10ff', '10si', '10fg', '100ff'):
+    if base in ('10ff', '10si', '10fg', '10fg6', '100ff'):
         return 'plasma'
     if base in ('tcc', 'lcc', 'mcc', 'hcc'):
         return 'Greys'
@@ -872,8 +873,8 @@ def _refresh_obs_layer(widgets_dict, base_path, obs_df=None):
     values = pd.to_numeric(obs_df.get('value_0'), errors='coerce').to_numpy()
     finite = np.isfinite(values)
     if finite.any():
-        vmin = float(np.nanpercentile(values[finite], 2))
-        vmax = float(np.nanpercentile(values[finite], 98))
+        vmin = float(np.nanpercentile(values[finite], 1))
+        vmax = float(np.nanpercentile(values[finite], 99))
         data_min = float(np.nanmin(values[finite]))
         data_max = float(np.nanmax(values[finite]))
         if vmin == vmax:
@@ -899,7 +900,16 @@ def _refresh_obs_layer(widgets_dict, base_path, obs_df=None):
     stnids = obs_df.get('stnid', pd.Series([''] * n_in_area)).astype(str).to_numpy()
     elevations = obs_df.get('elevation', pd.Series([''] * n_in_area)).to_numpy()
 
-    markers = []
+    # Find the min/max station indices to highlight them.
+    idx_min = idx_max = None
+    if finite.any():
+        idx_min = int(np.nanargmin(values))
+        idx_max = int(np.nanargmax(values))
+
+    # Build a single GeoJSON layer instead of one CircleMarker per station.
+    # Sending one JSON blob to the frontend is far faster than syncing
+    # thousands of individual ipywidget objects.
+    features = []
     for i in range(n_in_area):
         try:
             lat = float(lats[i]); lon = float(lons_disp[i])
@@ -908,25 +918,45 @@ def _refresh_obs_layer(widgets_dict, base_path, obs_df=None):
         val = values[i]
         val_str = _format_obs_value(val, units)
         color = hex_colors[i] if np.isfinite(val) else '#888888'
-        marker = CircleMarker(
-            location=(lat, lon),
-            radius=5,
-            color='#222222',
-            fill_color=color,
-            fill_opacity=0.9,
-            weight=1,
-        )
-        marker.popup = widgets.HTML(
-            value=(
-                f"<b>Station {stnids[i]}</b><br>"
-                f"Value: <b>{val_str}</b><br>"
-                f"Lat: {lat:.3f}, Lon: {lon:.3f}<br>"
-                f"Elevation: {elevations[i]} m"
-            )
-        )
-        markers.append(marker)
+        is_extreme = (i == idx_min or i == idx_max)
+        features.append({
+            'type': 'Feature',
+            'geometry': {'type': 'Point', 'coordinates': [lon, lat]},
+            'properties': {
+                'color': color,
+                'radius': 9 if is_extreme else 5,
+                'weight': 3 if is_extreme else 1,
+                'popup': (
+                    f"<b>Station {stnids[i]}</b><br>"
+                    f"Value: <b>{val_str}</b><br>"
+                    f"Lat: {lat:.3f}, Lon: {lon:.3f}<br>"
+                    f"Elevation: {elevations[i]} m"
+                ),
+            },
+        })
 
-    layer_group.layers = tuple(markers)
+    geojson_layer = GeoJSON(
+        data={'type': 'FeatureCollection', 'features': features},
+        point_style={'radius': 5, 'weight': 1, 'opacity': 1.0,
+                     'fillOpacity': 0.9},
+        style_callback=lambda feature: {
+            'fillColor': feature['properties']['color'],
+            'color': '#222222',
+            'radius': feature['properties'].get('radius', 5),
+            'weight': feature['properties'].get('weight', 1),
+        },
+        hover_style={'weight': 3},
+        name='obs_stations',
+    )
+
+    def _on_click(event=None, feature=None, **_):
+        if feature and 'properties' in feature:
+            widgets_dict['obs_status_w'].value = (
+                f'<span style="color:#060">{feature["properties"].get("popup", "")}</span>'
+            )
+
+    geojson_layer.on_click(_on_click)
+    layer_group.layers = (geojson_layer,)
 
     # Build colorbar HTML.
     if 'obs_colorbar_w' in widgets_dict and finite.any():
@@ -939,7 +969,7 @@ def _refresh_obs_layer(widgets_dict, base_path, obs_df=None):
                 f'<b>{param}</b> &nbsp; '
                 f'<span style="font-size:11px;color:#666">'
                 f'min/max: {data_min:.2f} / {data_max:.2f} {units} &nbsp;|&nbsp; '
-                f'colour-clipped at 2/98 percentile: {vmin:.2f}–{vmax:.2f} {units}'
+                f'colour-clipped at 1/99 percentile: {vmin:.2f}–{vmax:.2f} {units}'
                 f'</span><br>{html}</div>'
             )
         except Exception as e:
@@ -947,16 +977,17 @@ def _refresh_obs_layer(widgets_dict, base_path, obs_df=None):
                 f'<span style="color:#a00">Could not render colorbar: {e}</span>'
             )
 
+    n_features = len(features)
     elapsed = time.perf_counter() - t0
     if filtered:
         widgets_dict['obs_status_w'].value = (
-            f'<span style="color:#060">Showing {len(markers):,} of {n_total:,} stations '
+            f'<span style="color:#060">Showing {n_features:,} of {n_total:,} stations '
             f'(filtered to [N{north}, W{west}, S{south}, E{east}]). '
             f'Render: {elapsed:.2f}s</span>'
         )
     else:
         widgets_dict['obs_status_w'].value = (
-            f'<span style="color:#060">Showing {len(markers):,} stations '
+            f'<span style="color:#060">Showing {n_features:,} stations '
             f'(click a marker for details). Render: {elapsed:.2f}s</span>'
         )
 

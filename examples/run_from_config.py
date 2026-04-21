@@ -46,8 +46,10 @@ def main():
         "config", help="Path to a run_config.json file."
     )
     parser.add_argument(
-        "--base-path", default=os.path.join(REPO_DIR, "data_files"),
-        help="Base directory for cached data (default: <repo>/data_files).",
+        "--base-path", default=None,
+        help=("Base directory for cached data. If omitted, uses the "
+              "'base_path' saved inside the run_config.json, otherwise "
+              "defaults to <repo>/data_files."),
     )
     parser.add_argument(
         "--no-interactive", action="store_true",
@@ -72,16 +74,24 @@ def main():
     widgets_dict = load_run_config(args.config)
     config = widgets_dict['config']
 
+    # Resolve base_path: CLI arg > value saved in config > <repo>/data_files
+    base_path = (
+        args.base_path
+        or config.get('base_path')
+        or os.path.join(REPO_DIR, "data_files")
+    )
+    print(f"Using base_path: {base_path}")
+
     # 2. Retrieve data (uses cache when available)
     print("Retrieving data...")
-    plot_data = retrieve_and_store_data(widgets_dict, args.base_path)
+    plot_data = retrieve_and_store_data(widgets_dict, base_path)
 
     # 3. Build output directory paths
     area_str = get_area_string(config['area_sub'])
     date_str = config['valid_date'].strftime("%Y%m%d")
     time_str = f"{config['valid_date'].hour:02d}00"
     _, _, plot_dir = setup_data_directories(
-        args.base_path, config['param'], area_str, date_str, time_str
+        base_path, config['param'], area_str, date_str, time_str
     )
 
     # 4. Forecast evolution plots
@@ -133,6 +143,10 @@ def main():
 
 if __name__ == "__main__":
     main()
+    # Force immediate process exit — Metview and earthkit.data can leave
+    # non-daemon helper threads / subprocesses alive that otherwise prevent
+    # the script from returning control to the shell.
+    os._exit(0)
 
 
 # ======================================================================

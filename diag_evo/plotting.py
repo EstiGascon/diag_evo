@@ -445,6 +445,8 @@ def plot_forecast_evolution_static(plot_data, widgets_dict, plot_dir,
         'axes.edgecolor': '.3',
         'grid.color': '.85',
         'axes.grid.axis': 'y',
+        'font.family': 'DejaVu Sans',
+        'axes.titlepad': 10,
     })
     fig_mpl, ax = plt.subplots(figsize=figsize)
 
@@ -490,7 +492,7 @@ def plot_forecast_evolution_static(plot_data, widgets_dict, plot_dir,
                     color=color, lw=2.2, solid_capstyle='round', zorder=5)
             ax.plot([x - median_bar_width / 2, x + median_bar_width / 2],
                     [p[pctl_to_idx[50]], p[pctl_to_idx[50]]],
-                    color='black', lw=3, zorder=8)
+                    color='black', lw=3, zorder=7)
 
         _dlabel = _model_display_label(model_name)
         ens_handles.append(plt.Line2D([0], [0], color=color, lw=10, alpha=1,
@@ -560,15 +562,30 @@ def plot_forecast_evolution_static(plot_data, widgets_dict, plot_dir,
         ax.axvline(x=xticks[i] - 0.5, color='gray', alpha=0.3, linewidth=0.8, zorder=1)
         ax.axvline(x=xticks[i] + 0.5, color='gray', alpha=0.3, linewidth=0.8, zorder=1)
 
-    # Axes formatting
+    # Axes formatting — choose tick font size and label angle based on
+    # the number of rows so labels never overlap.
+    n_ticks = len(xticks)
+    if n_ticks <= 10:
+        tick_fs = 13
+        tick_rot = 0
+        tick_ha = 'center'
+    elif n_ticks <= 20:
+        tick_fs = 11
+        tick_rot = 0
+        tick_ha = 'center'
+    else:
+        tick_fs = 9
+        tick_rot = 30
+        tick_ha = 'right'
+
     ax.set_xticks(xticks)
-    ax.set_xticklabels(date_labels, rotation=70, ha='right', fontsize=15)
-    ax.set_xlabel('Forecast Initialization Date/Time', fontsize=16)
-    ax.set_ylabel(_build_ylabel(param, widgets_dict), fontsize=22)
-    ax.tick_params(axis='y', labelsize=15)
+    ax.set_xticklabels(date_labels, rotation=tick_rot, ha=tick_ha, fontsize=tick_fs)
+    ax.set_xlabel('Forecast Initialization Date/Time', fontsize=14)
+    ax.set_ylabel(_build_ylabel(param, widgets_dict), fontsize=20)
+    ax.tick_params(axis='y', labelsize=13)
 
     titre = _build_title_text(valid_date, point, area_sub, plot_data, html=False)
-    ax.set_title(titre, fontsize=18)
+    ax.set_title(titre, fontsize=14, loc='left', pad=10)
 
     # Legend
     legend_entries = list(ens_handles)
@@ -654,25 +671,60 @@ def _add_reference_traces(fig, data_df, plot_data):
         )
 
 
+def _fmt_lat(lat):
+    """Format a latitude value with correct N/S hemisphere label."""
+    hemi = 'N' if lat >= 0 else 'S'
+    return f"{abs(lat):.2f}\u00b0{hemi}"
+
+
+def _fmt_lon(lon):
+    """Format a longitude value with correct E/W hemisphere label."""
+    hemi = 'E' if lon >= 0 else 'W'
+    return f"{abs(lon):.2f}\u00b0{hemi}"
+
+
 def _build_title_text(valid_date, point, area_sub, plot_data, html=True):
     """Build the plot title string."""
     sep = "<br>" if html else "\n"
-    date_str = valid_date.strftime('%b ') + str(valid_date.day) + valid_date.strftime(' %Hz %Y')
+    date_str = valid_date.strftime('%d %b %Y %H') + 'z'
+    param_label = plot_data.get('var_settings', {}).get('description', '')
+    units = plot_data.get('var_settings', {}).get('units', '')
+    param_str = f"{param_label} ({units})" if param_label else ''
     if point:
-        titre = (f"Forecast Evolution (Valid: {date_str}) "
-                 f"at {point[0]:.2f}\u00b0N, {point[1]:.2f}\u00b0E")
+        loc_str = f"{_fmt_lat(point[0])}, {_fmt_lon(point[1])}"
+        if html:
+            line1 = f"<b>Forecast Evolution</b>  \u2022  Valid: <b>{date_str}</b>"
+            line2 = f"Location: {loc_str}"
+            if param_str:
+                line2 += f"  \u2022  {param_str}"
+        else:
+            line1 = f"Forecast Evolution  |  Valid: {date_str}"
+            line2 = f"Location: {loc_str}"
+            if param_str:
+                line2 += f"  |  {param_str}"
+        titre = line1 + sep + line2
         ns = plot_data.get('nearest_gridinfo_dict', {}).get('nearest_station')
         if ns is not None:
-            titre += (f"{sep}Nearest station {ns['stnid']} "
-                      f"(elev {ns['elevation']} m, "
-                      f"{ns['latitude']:.2f}\u00b0N, {ns['longitude']:.2f}\u00b0E, "
-                      f"{ns['distance']:.1f} km, val {ns['value_0']:.2f})")
+            ns_str = (f"Nearest obs station: {ns['stnid']}  "
+                      f"({_fmt_lat(ns['latitude'])}, {_fmt_lon(ns['longitude'])}, "
+                      f"elev {ns['elevation']} m, {ns['distance']:.1f} km away, "
+                      f"obs value: {ns['value_0']:.2f})")
+            titre += sep + ns_str
     else:
-        titre = (f"Forecast Evolution (Valid: {date_str}) "
-                 f"for [{area_sub[0]:.2f}\u00b0N, {area_sub[1]:.2f}\u00b0E] – "
-                 f"[{area_sub[2]:.2f}\u00b0N, {area_sub[3]:.2f}\u00b0E]")
+        sw = f"{_fmt_lat(area_sub[2])}, {_fmt_lon(area_sub[1])}"
+        ne = f"{_fmt_lat(area_sub[0])}, {_fmt_lon(area_sub[3])}"
+        if html:
+            line1 = f"<b>Forecast Evolution</b>  \u2022  Valid: <b>{date_str}</b>"
+            line2 = f"Area: SW ({sw}) \u2013 NE ({ne})"
+            if param_str:
+                line2 += f"  \u2022  {param_str}"
+        else:
+            line1 = f"Forecast Evolution  |  Valid: {date_str}"
+            line2 = f"Area: SW ({sw}) \u2013 NE ({ne})"
+            if param_str:
+                line2 += f"  |  {param_str}"
+        titre = line1 + sep + line2
     return titre
-
 
 def _build_export_filename(plot_dir, point, area_sub, valid_date, param,
                             ext, prefix='forecast_evolution'):
@@ -695,8 +747,8 @@ def _draw_inset_map(fig_mpl, area_sub, point, right_x, right_w,
     map_n, map_w, map_s, map_e = area_sub
     center_lat = (map_n + map_s) / 2.0
     center_lon = (map_w + map_e) / 2.0
-    lat_span = max(abs(map_n - map_s), 2.0) * 2.5
-    lon_span = max(abs(map_e - map_w), 2.0) * 2.5
+    lat_span = max(abs(map_n - map_s), 2.0) * 2.5 - 4.0
+    lon_span = max(abs(map_e - map_w), 2.0) * 2.5 - 4.0
 
     axins = fig_mpl.add_axes(
         [right_x, _map_y, right_w, _map_h],

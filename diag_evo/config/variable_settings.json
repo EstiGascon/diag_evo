@@ -373,6 +373,7 @@
                         "grib_units": [
                                 "m/s",
                                 "m s-1",
+                                "m s**-1",
                                 "ms-1",
                                 "M/S"
                         ],
@@ -385,6 +386,10 @@
                                         "to_display": "none",
                                         "from_display": "none"
                                 },
+                                "m s**-1": {
+                                        "to_display": "none",
+                                        "from_display": "none"
+                                },
                                 "ms-1": {
                                         "to_display": "none",
                                         "from_display": "none"
@@ -394,7 +399,48 @@
                                         "from_display": "none"
                                 }
                         },
-                        "paramId": 49
+                        "paramId": 49,
+                        "obs_param": "10fg",
+                        "obs_source": "wgust",
+                        "obs_period": 6
+                },
+                "10fg6": {
+                        "levtype": "sfc",
+                        "description": "Maximum 10 metre wind gust in the last 6 hours",
+                        "is_accumulated": false,
+                        "units": "m/s",
+                        "grib_units": [
+                                "m/s",
+                                "m s-1",
+                                "m s**-1",
+                                "ms-1",
+                                "M/S"
+                        ],
+                        "conversion_rules": {
+                                "m/s": {
+                                        "to_display": "none",
+                                        "from_display": "none"
+                                },
+                                "m s-1": {
+                                        "to_display": "none",
+                                        "from_display": "none"
+                                },
+                                "m s**-1": {
+                                        "to_display": "none",
+                                        "from_display": "none"
+                                },
+                                "ms-1": {
+                                        "to_display": "none",
+                                        "from_display": "none"
+                                },
+                                "M/S": {
+                                        "to_display": "none",
+                                        "from_display": "none"
+                                }
+                        },
+                        "obs_param": "10fg",
+                        "obs_source": "wgust",
+                        "obs_period": 6
                 },
                 "10u": {
                         "levtype": "sfc",

@@ -104,15 +104,24 @@ def _retrieve_with_timeout(timeout=MARS_RETRIEVAL_TIMEOUT, *args, **kwargs):
     if not timeout:
         return earthkit.data.from_source(*args, **kwargs)
 
-    with ThreadPoolExecutor(max_workers=1) as pool:
-        future = pool.submit(earthkit.data.from_source, *args, **kwargs)
-        try:
-            return future.result(timeout=timeout)
-        except FuturesTimeoutError:
-            raise TimeoutError(
-                f"MARS retrieval timed out after {timeout} seconds. "
-                "The data source may be temporarily unavailable."
-            )
+    # NOTE: we deliberately do NOT use ``with ThreadPoolExecutor(...)`` here.
+    # The context manager calls ``shutdown(wait=True)`` on exit, which would
+    # block until the underlying MARS call returns — defeating the timeout.
+    # Instead, shut the pool down without waiting so ``TimeoutError`` can
+    # actually propagate to the caller. The orphaned worker thread will
+    # finish in the background; the MARS subprocess itself cannot be
+    # cancelled from Python, but the user regains control immediately.
+    pool = ThreadPoolExecutor(max_workers=1)
+    future = pool.submit(earthkit.data.from_source, *args, **kwargs)
+    try:
+        return future.result(timeout=timeout)
+    except FuturesTimeoutError:
+        raise TimeoutError(
+            f"MARS retrieval timed out after {timeout} seconds. "
+            "The data source may be temporarily unavailable."
+        )
+    finally:
+        pool.shutdown(wait=False, cancel_futures=True)
 
 
 # ---------------------------------------------------------------------------
@@ -488,7 +497,7 @@ def _build_base_request(param, levtype, level, date, time, area):
 # ---------------------------------------------------------------------------
 
 # STVL parameters known to be available as station observations.
-STVL_AVAILABLE_PARAMS = ['10ff', '2d', '2t', 'msl', 'pres', 'sd', 'tcc', 'vis', 'tp']
+STVL_AVAILABLE_PARAMS = ['10ff', '2d', '2t', 'msl', 'pres', 'sd', 'tcc', 'vis', 'tp', '10fg', '10fg6']
 
 
 def fetch_observations_only(param, valid_date, area, base_path, acc_period=None):
@@ -546,27 +555,43 @@ def fetch_observations_only(param, valid_date, area, base_path, acc_period=None)
         else:
             print(f"Retrieving STVL observations for {param} "
                   f"(valid {date_str} {time_str}, area {area})...")
-            period = (
-                str(acc_period) if var_settings.get('is_accumulated', False)
-                and acc_period is not None else None
-            )
-            obs1 = mv.stvl(
-                parameter=stvl_param,
-                dates=date_str,
-                times=valid_date.hour,
-                sources="synop",
-                area=area,
-                period=period,
-            )
-            obs2 = mv.stvl(
-                parameter=stvl_param,
-                dates=date_str,
-                times=valid_date.hour,
-                sources="hdobs",
-                area=area,
-                period=period,
-            )
-            obs = mv.merge(obs1, obs2)
+            # Period: explicit `obs_period` in settings wins; otherwise use
+            # acc_period for accumulated vars, else None.
+            if 'obs_period' in var_settings:
+                period = str(var_settings['obs_period'])
+            elif var_settings.get('is_accumulated', False) and acc_period is not None:
+                period = str(acc_period)
+            else:
+                period = None
+            # Custom source (e.g. 'wgust' for 10fg) overrides synop/hdobs merge.
+            custom_source = var_settings.get('obs_source')
+            if custom_source:
+                obs = mv.stvl(
+                    parameter=stvl_param,
+                    dates=date_str,
+                    times=valid_date.hour,
+                    sources=custom_source,
+                    area=area,
+                    period=period,
+                )
+            else:
+                obs1 = mv.stvl(
+                    parameter=stvl_param,
+                    dates=date_str,
+                    times=valid_date.hour,
+                    sources="synop",
+                    area=area,
+                    period=period,
+                )
+                obs2 = mv.stvl(
+                    parameter=stvl_param,
+                    dates=date_str,
+                    times=valid_date.hour,
+                    sources="hdobs",
+                    area=area,
+                    period=period,
+                )
+                obs = mv.merge(obs1, obs2)
             obs = mv.remove_duplicates(obs)
             mv.write(obs_file, obs)
             obs_df = obs.to_dataframe()
@@ -618,25 +643,43 @@ def _retrieve_observations(param, var_settings, levtype, valid_date, area_sub,
             obs_geopoints = mv.read(obs_file)
         else:
             print("Retrieving new observation data...")
-            period = str(acc_period_value) if var_settings.get('is_accumulated', False) else None
+            # Period: explicit `obs_period` in settings wins; otherwise use
+            # acc_period for accumulated vars, else None.
+            if 'obs_period' in var_settings:
+                period = str(var_settings['obs_period'])
+            elif var_settings.get('is_accumulated', False):
+                period = str(acc_period_value)
+            else:
+                period = None
             stvl_param = var_settings.get('obs_param', get_base_var(param))
-            obs1 = mv.stvl(
-                parameter=stvl_param,
-                dates=date_str,
-                times=valid_date.hour,
-                sources="synop",
-                area=retrieval_area,
-                period=period,
-            )
-            obs2 = mv.stvl(
-                parameter=stvl_param,
-                dates=date_str,
-                times=valid_date.hour,
-                sources="hdobs",
-                area=retrieval_area,
-                period=period,
-            )
-            obs = mv.merge(obs1, obs2)
+            custom_source = var_settings.get('obs_source')
+            if custom_source:
+                obs = mv.stvl(
+                    parameter=stvl_param,
+                    dates=date_str,
+                    times=valid_date.hour,
+                    sources=custom_source,
+                    area=retrieval_area,
+                    period=period,
+                )
+            else:
+                obs1 = mv.stvl(
+                    parameter=stvl_param,
+                    dates=date_str,
+                    times=valid_date.hour,
+                    sources="synop",
+                    area=retrieval_area,
+                    period=period,
+                )
+                obs2 = mv.stvl(
+                    parameter=stvl_param,
+                    dates=date_str,
+                    times=valid_date.hour,
+                    sources="hdobs",
+                    area=retrieval_area,
+                    period=period,
+                )
+                obs = mv.merge(obs1, obs2)
             obs = mv.remove_duplicates(obs)
             mv.write(obs_file, obs)
             obs_df = obs.to_dataframe()
