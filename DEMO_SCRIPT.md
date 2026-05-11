@@ -1,11 +1,8 @@
 # Forecast Evolution Tool — Demo Script
 
-**Duration:** ~25 minutes  
-**Presenter setup:** JupyterHub session running, repo cloned, kernel selected.
-
 ---
 
-## Part 1 — Introduction to Jupyter Notebooks (~4 min)
+## Part 1 — Introduction to Jupyter Notebooks 
 
 > Open `intro_to_jupyter.ipynb`
 
@@ -32,7 +29,7 @@ git clone https://git.ecmwf.int/scm/~ecm3468/diag_evo.git diag_evo
 
 ---
 
-## Part 2 — Forecast Evolution Notebook (~20 min)
+## Part 2 — Forecast Evolution Notebook 
 
 > Open `forecast_evolution.ipynb`
 
@@ -231,7 +228,7 @@ plot_forecast_evolution_static(plot_data_nb, widgets_dict, plot_dir, export_png=
 
 ---
 
-## Part 3 — Programmatic / Command-Line Usage (mention briefly)
+## Part 3 — Programmatic / Command-Line Usage 
 
 > Can be explored independently via `programmatic_workflow.ipynb` and `examples/`
 
@@ -265,7 +262,7 @@ Edit these to customise without changing Python code.
 - **Retrieval timeout:** 180 sec per MARS request (configurable in `core.py` via `MARS_RETRIEVAL_TIMEOUT`). If a model fails, remaining steps for that model are skipped.
 - **Plotting settings** can be manually edited in `plot_settings.json`
 - **Plotly vs static box plots differ:** Plotly uses standard IQR; static uses ECMWF/Metview percentile convention
-- **Projection:** Map plots use `POLAR_STEREO` projection
+- **Projection:** Map plots use `POLAR_STEREOGRAPHIC` projection
 - **Longitude normalisation:** Out-of-range longitudes (from map scrolling) are automatically wrapped to [-180, 180]
 
 ---
