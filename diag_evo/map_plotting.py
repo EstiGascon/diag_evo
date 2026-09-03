@@ -11,7 +11,7 @@ import metview as mv
 from datetime import datetime, timedelta
 
 from .variables import get_base_var, get_variable_settings, get_grib_units
-from .settings import get_model_retrieval_settings, get_analysis_settings
+from .settings import get_model_retrieval_settings, get_analysis_settings, get_model_plot_settings
 
 # ---------------------------------------------------------------------------
 # Contour presets keyed by variable "category"
@@ -686,6 +686,146 @@ def plot_obs_map(plot_data, widgets_dict, plot_radius=0, export_png=True,
         print(f"Obs map exported to: {png_name}.png")
     else:
         mv.plot(obs_data, obs_marker, geoview, *legend_objects, title, *area_overlay)
+
+
+# ---------------------------------------------------------------------------
+# Public API — nearest-gridpoint map (point mode only)
+# ---------------------------------------------------------------------------
+
+def plot_nearest_gridpoints_map(plot_data, widgets_dict, plot_radius=0.5,
+                                export_png=True):
+    """Plot the nearest-gridpoint location used by each model (point mode only).
+
+    Draws the user-selected point (red "+"), the nearest observation
+    station (black "X"), and one coloured "X" per selected model at its
+    nearest-gridpoint location — the colour matches that model's plot
+    legend colour. Distances (km) from the selected point are listed in a
+    text block. Land/sea shading on the coastlines lets you see whether a
+    gridpoint falls on land or over the sea.
+
+    Parameters
+    ----------
+    plot_data : dict
+        The dict returned by ``retrieve_and_store_data``.
+    widgets_dict : dict
+        The widgets dictionary with ``config`` sub-dict.
+    plot_radius : float
+        Degrees to pad around the selected point for the map view.
+    export_png : bool
+        If True, save a PNG to the plot directory.
+    """
+    from .core import _model_display_label
+
+    config = widgets_dict['config']
+    point = config.get('point')
+    if point is None:
+        raise ValueError(
+            "plot_nearest_gridpoints_map() requires point mode "
+            "(widgets_dict['config']['point'] must be set) — "
+            "not available for an area selection."
+        )
+
+    param = config['param']
+    valid_date = config['valid_date']
+    selected_models = config.get('selected_models') or list(widgets_dict['model_widgets'].value)
+    nginfo = plot_data.get('nearest_gridinfo_dict', {})
+
+    dir_name, base_path, _ = _resolve_data_dir(plot_data, widgets_dict)
+
+    lat_u, lon_u = float(point[0]), float(point[1])
+    coastlines = mv.mcoast(
+        map_coastline_colour="charcoal",
+        map_coastline_thickness=3.5,
+        map_coastline_resolution="medium",
+        map_coastline_land_shade="on",
+        map_coastline_land_shade_colour="cream",
+        map_coastline_sea_shade="on",
+        map_coastline_sea_shade_colour="rgb(0.75,0.87,0.97)",
+        map_boundaries="on",
+        map_rivers="on",
+        map_boundaries_colour="charcoal",
+        map_boundaries_thickness=2.5,
+        map_grid_colour="tan",
+        map_label_colour="RGB(0,0,0)",
+    )
+    padded = [lat_u + plot_radius, lon_u - plot_radius * 1.5,
+              lat_u - plot_radius, lon_u + plot_radius * 1.5]
+    geoview = mv.geoview(
+        map_projection="polar_stereographic",
+        map_area_definition="corners",
+        area=padded,
+        map_vertical_longitude=lon_u,
+        coastlines=coastlines,
+    )
+
+    size = 0.06  # degrees, marker half-size
+
+    def _cross(lat, lon, colour, thickness):
+        style = mv.mgraph(graph_line_colour=colour, graph_line_thickness=thickness)
+        return [
+            mv.mvl_geopolyline([lat, lat], [lon - size, lon + size], 0.02), style,
+            mv.mvl_geopolyline([lat - size, lat + size], [lon, lon], 0.02), style,
+        ]
+
+    def _diag_cross(lat, lon, colour, thickness):
+        style = mv.mgraph(graph_line_colour=colour, graph_line_thickness=thickness)
+        d = size * 0.8
+        return [
+            mv.mvl_geopolyline([lat - d, lat + d], [lon - d, lon + d], 0.02), style,
+            mv.mvl_geopolyline([lat - d, lat + d], [lon + d, lon - d], 0.02), style,
+        ]
+
+    objs = list(_cross(lat_u, lon_u, "red", 5))
+    legend_lines = [f"Selected point (red +): {lat_u:.3f}, {lon_u:.3f}"]
+
+    station = nginfo.get('nearest_station')
+    if station is not None:
+        try:
+            lat_s = float(station['latitude'])
+            lon_s = float(station['longitude'])
+            dist_s = float(station['distance'])
+            objs.extend(_diag_cross(lat_s, lon_s, "black", 4))
+            legend_lines.append(f"Obs station (black X): {dist_s:.2f} km")
+        except (KeyError, TypeError, ValueError):
+            pass
+
+    for model_name in selected_models:
+        info = nginfo.get(f'{model_name}_nearest')
+        if info is None:
+            continue
+        try:
+            lat_m = float(info['latitude'])
+            lon_m = float(info['longitude'])
+            dist_m = float(info['distance'])
+        except (KeyError, TypeError, ValueError):
+            continue
+        colour = get_model_plot_settings(model_name).get('color', 'black')
+        objs.extend(_diag_cross(lat_m, lon_m, colour, 4))
+        legend_lines.append(f"{_model_display_label(model_name)}: {dist_m:.2f} km")
+
+    text_kwargs = {'text_line_count': len(legend_lines), 'text_font_size': 0.5}
+    for i, line in enumerate(legend_lines, start=1):
+        text_kwargs[f'text_line_{i}'] = line
+    legend_text = mv.mtext(**text_kwargs)
+
+    title = mv.mtext(
+        text_line_count=2,
+        text_line_1=f"Nearest gridpoints — {param}",
+        text_line_2=f"Valid: {valid_date.strftime('%Y-%m-%d %H:%M')}",
+        text_font_size=0.6,
+    )
+
+    if export_png:
+        date_str = valid_date.strftime("%Y%m%d")
+        time_str = f"{valid_date.hour:02d}00"
+        plot_dir = os.path.join(base_path, dir_name, "plot_files")
+        os.makedirs(plot_dir, exist_ok=True)
+        png_name = os.path.join(plot_dir, f"map_nearest_gridpoints_{param}_{date_str}_{time_str}")
+        mv.setoutput(mv.png_output(output_name=png_name, output_name_first_page_number='off', output_font_scale=1.6, output_width=2200))
+        mv.plot(geoview, *objs, title, legend_text)
+        print(f"Nearest-gridpoints map exported to: {png_name}.png")
+    else:
+        mv.plot(geoview, *objs, title, legend_text)
 
 
 # ---------------------------------------------------------------------------

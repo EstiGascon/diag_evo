@@ -36,7 +36,12 @@ from .plotting import (
     plot_forecast_evolution_static,
 )
 
-from .map_plotting import plot_field_map, plot_obs_map, plot_analysis_map
+from .map_plotting import (
+    plot_field_map,
+    plot_obs_map,
+    plot_analysis_map,
+    plot_nearest_gridpoints_map,
+)
 
 from .settings import (
     register_custom_model,
@@ -71,6 +76,7 @@ __all__ = [
     "plot_field_map",
     "plot_obs_map",
     "plot_analysis_map",
+    "plot_nearest_gridpoints_map",
     # Model management
     "register_custom_model",
     "unregister_custom_model",

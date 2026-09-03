@@ -241,7 +241,7 @@ def _cached_retrieve(filepath, build_request_fn):
         print(f"File exists, reading: {os.path.basename(filepath)}")
         return mv.read(filepath)
     data = build_request_fn()
-    data.save(filepath)
+    data.to_target('file', filepath)
     return mv.read(filepath)
 
 
@@ -280,6 +280,12 @@ def sanitize_mars_request(request):
         req.pop('address', None)
 
     req.pop('ensemble', None)
+    # 'valid_times' is only used internally to snap fc_date to a model's
+    # allowed run times (see _retrieve_single_model_step). It is not a
+    # real MARS keyword; leaving it in causes MARS/metkit to translate it
+    # into a VERIFY constraint, which produces field-count mismatches
+    # (e.g. "Expected 4, got 2") and makes the whole retrieval fail.
+    req.pop('valid_times', None)
 
     return req
 
@@ -861,17 +867,33 @@ def _retrieve_single_model_step(model_name, param, var_settings, levtype, level,
             return None
 
     acc_period = acc_period_value if var_settings.get('is_accumulated', False) else None
-    model_file = os.path.join(grib_dir, _model_grib_filename(
-        model_name, param, levtype, level, fc_date, step, acc_period=acc_period))
 
     model_ret = get_model_retrieval_settings(model_name)
     is_ensemble = model_ret.get('ensemble', False)
 
+    # Snap fc_date to the nearest earlier valid run time if the model has
+    # restricted run times (e.g. IFS runs only at 00z and 12z).
+    valid_times = model_ret.get('valid_times')
+    if valid_times and fc_date.hour not in valid_times:
+        # Find the most recent valid run time before fc_date
+        hours_back = min((fc_date.hour - vt) % 24 for vt in valid_times)
+        snapped_fc_date = fc_date - timedelta(hours=hours_back)
+        snapped_step = step + hours_back
+        print(f"  [{model_name}] Snapping fc_date {fc_date} (time={fc_date.hour:02d}z) "
+              f"→ {snapped_fc_date} (step {step}h → {snapped_step}h)")
+    else:
+        snapped_fc_date = fc_date
+        snapped_step = step
+
+    model_file = os.path.join(grib_dir, _model_grib_filename(
+        model_name, param, levtype, level, snapped_fc_date, snapped_step,
+        acc_period=acc_period))
+
     def _do_retrieve(retrieve_param=param):
         """Build and execute a MARS request for *retrieve_param*."""
-        print(f"Retrieving {model_name} '{retrieve_param}' from MARS for step {step}...")
+        print(f"Retrieving {model_name} '{retrieve_param}' from MARS for step {snapped_step}...")
         request = _build_base_request(
-            retrieve_param, levtype, level, fc_date, fc_date.hour,
+            retrieve_param, levtype, level, snapped_fc_date, snapped_fc_date.hour,
             retrieval_area)
         request.update(model_ret)
 
@@ -879,20 +901,20 @@ def _retrieve_single_model_step(model_name, param, var_settings, levtype, level,
             request.pop('grid', None)
 
         if model_name == "DE-LUMI":
-            return _retrieve_de_lumi(request, var_settings, acc_period_value, step)
+            return _retrieve_de_lumi(request, var_settings, acc_period_value, snapped_step)
 
         # --- Build step/number/expver ---
         if var_settings.get('is_accumulated', False):
-            step_start = max(0, step - acc_period_value)
-            request["step"] = f"{step_start}/{step}"
+            step_start = max(0, snapped_step - acc_period_value)
+            request["step"] = f"{step_start}/{snapped_step}"
         else:
-            request["step"] = step
+            request["step"] = snapped_step
 
         if is_ensemble and str(request.get('type', '')).lower() == 'pf':
             request["number"] = [1, "TO", n_members]
 
         if model_name == "AIFS ENS":
-            if fc_date <= datetime(2025, 7, 1, 0, 0):
+            if snapped_fc_date <= datetime(2025, 7, 1, 0, 0):
                 request['expver'] = '103'
             else:
                 request['expver'] = '1'
@@ -912,7 +934,7 @@ def _retrieve_single_model_step(model_name, param, var_settings, levtype, level,
             component_data = []
             for comp_param in deriv['components']:
                 comp_file = os.path.join(grib_dir, _model_grib_filename(
-                    model_name, comp_param, levtype, level, fc_date, step,
+                    model_name, comp_param, levtype, level, snapped_fc_date, snapped_step,
                     acc_period=acc_period))
                 comp_data = _cached_retrieve(
                     comp_file, lambda cp=comp_param: _do_retrieve(cp))
@@ -1313,6 +1335,7 @@ def retrieve_and_store_data(widgets_dict, base_path):
 
     # 6. Retrieve model data
     timed_out_models = set()
+    consecutive_timeouts = {}
     for idx, (fc_date, step) in enumerate(zip(forecast_dates, forecast_steps)):
         print(f"\nRetrieving data for forecast date {fc_date} at step {step}...")
 
@@ -1333,15 +1356,28 @@ def retrieve_and_store_data(widgets_dict, base_path):
                     print(f"Storing data for {model_name} (ensemble: {ms['ensemble']})")
                     for suffix, value in result.items():
                         data_df.at[idx, _col(model_name, suffix)] = value
+                consecutive_timeouts[model_name] = 0
 
             except TimeoutError as e:
-                print(
-                    f"\n{'='*60}\n"
-                    f"TIMEOUT: {model_name} for step {step} — skipping this model for all remaining steps.\n"
-                    f"{str(e)}\n"
-                    f"{'='*60}"
-                )
-                timed_out_models.add(model_name)
+                consecutive_timeouts[model_name] = consecutive_timeouts.get(model_name, 0) + 1
+                # A single slow request can just be transient MARS load; only
+                # give up on the model after repeated back-to-back timeouts.
+                if consecutive_timeouts[model_name] >= 2:
+                    print(
+                        f"\n{'='*60}\n"
+                        f"TIMEOUT: {model_name} for step {step} — {consecutive_timeouts[model_name]} "
+                        f"consecutive timeouts, skipping this model for all remaining steps.\n"
+                        f"{str(e)}\n"
+                        f"{'='*60}"
+                    )
+                    timed_out_models.add(model_name)
+                else:
+                    print(
+                        f"\n{'='*60}\n"
+                        f"TIMEOUT: {model_name} for step {step} — retrying at the next step.\n"
+                        f"{str(e)}\n"
+                        f"{'='*60}"
+                    )
 
             except Exception as e:
                 error_msg = (

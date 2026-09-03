@@ -11,7 +11,8 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import cartopy.crs as ccrs
 import cartopy.feature as cfeature
-from IPython.display import display
+import io
+from IPython.display import display, Image
 
 from .settings import (
     get_model_retrieval_settings,
@@ -629,7 +630,10 @@ def plot_forecast_evolution_static(plot_data, widgets_dict, plot_dir,
         fig_mpl.savefig(png_filename, dpi=150, bbox_inches='tight')
         print(f"Static plot exported to: {png_filename}")
 
-    plt.close(fig_mpl)
+    buf = io.BytesIO()
+    fig_mpl.savefig(buf, format='png', dpi=150, bbox_inches='tight')
+    buf.seek(0)
+    display(Image(buf.read()))
     return fig_mpl
 
 

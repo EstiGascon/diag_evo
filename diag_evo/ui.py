@@ -398,7 +398,10 @@ def create_widgets():
                     pass
                 retrieval_args[k] = v
 
-        is_ens = custom_ensemble_w.value
+        # type=pf always needs a MARS 'number' key, regardless of whether the
+        # Ensemble checkbox was ticked — force it on to avoid silently
+        # sending a memberless pf request that MARS will reject (0 fields).
+        is_ens = custom_ensemble_w.value or custom_type_w.value == 'pf'
         n_mem = custom_n_members_w.value if is_ens else 50
 
         register_custom_model(
