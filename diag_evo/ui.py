@@ -455,7 +455,7 @@ def create_widgets():
     m = Map(
         center=(51.45, -0.95), #Reading coords
         zoom=4,
-        basemap=basemaps.CartoDB.Positron,
+        basemap=basemaps.OpenStreetMap.Mapnik,
     )
     # Rectangle + point only (click-and-drag for area, marker for point).
     # Polygon / polyline / circle / circlemarker are disabled.
